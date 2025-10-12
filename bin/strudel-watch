@@ -1,0 +1,31 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/strudel"
+require_relative "../lib/strudel/live/pattern_evaluator"
+require_relative "../lib/strudel/live/file_watcher"
+require_relative "../lib/strudel/live/session"
+
+path = ARGV[0] || "pattern.rb"
+
+unless File.exist?(path)
+  warn "Error: File not found: #{path}"
+  warn ""
+  warn "Usage: bundle exec ruby bin/strudel-watch [path/to/pattern.rb]"
+  warn ""
+  warn "Create a pattern file first:"
+  warn '  echo \'sound("bd hh sd hh")\' > pattern.rb'
+  exit 1
+end
+
+session = Strudel::Live::Session.new
+
+trap("INT") do
+  puts "\nStopping..."
+  session.stop
+  exit
+end
+
+session.start(path)
+
+loop { sleep 1 }
