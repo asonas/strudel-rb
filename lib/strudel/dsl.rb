@@ -59,6 +59,39 @@ module Strudel
     def slowcat(*patterns)
       Pattern.slowcat(*patterns)
     end
+
+    # cat (fastcatのエイリアス)
+    def cat(*patterns)
+      Pattern.fastcat(*patterns)
+    end
+
+    # pure (単一値のパターン)
+    def pure(value)
+      Pattern.pure(value)
+    end
+
+    # gain パターン
+    def gain(pattern_string)
+      pattern = Mini::Parser.new.parse(pattern_string)
+      pattern.with_value { |v| v.to_f }
+    end
+
+    # speed パターン
+    def speed(pattern_string)
+      pattern = Mini::Parser.new.parse(pattern_string)
+      pattern.with_value { |v| v.to_f }
+    end
+
+    # pan パターン
+    def pan(pattern_string)
+      pattern = Mini::Parser.new.parse(pattern_string)
+      pattern.with_value { |v| v.to_f }
+    end
+
+    # euclid (ユークリッドリズム)
+    def euclid(pulses, steps, rotation = 0)
+      Pattern.euclid(pulses, steps, rotation)
+    end
   end
 
   # Runerクラス：DSLを使って簡単に再生できるようにする

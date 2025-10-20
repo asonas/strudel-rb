@@ -80,6 +80,69 @@ module Strudel
       end
     end
 
+    # ユークリッドリズム
+    def self.euclid(pulses, steps, rotation = 0)
+      return silence if pulses <= 0 || steps <= 0
+
+      # Bjorklundアルゴリズムでビートパターンを生成
+      pattern_array = bjorklund(pulses, steps)
+
+      # rotationを適用
+      pattern_array = pattern_array.rotate(rotation) if rotation != 0
+
+      # ビートの位置を計算
+      step_duration = Rational(1, steps)
+      beats = pattern_array.each_with_index.filter_map do |beat, i|
+        beat ? i : nil
+      end
+
+      # パターンを生成
+      Pattern.new do |state|
+        state.span.span_cycles.flat_map do |subspan|
+          cycle = subspan.begin_time.sam
+
+          beats.filter_map do |beat_pos|
+            whole_begin = cycle + Fraction.new(Rational(beat_pos, steps))
+            whole_end = cycle + Fraction.new(Rational(beat_pos + 1, steps))
+            whole = TimeSpan.new(whole_begin, whole_end)
+
+            part = whole.intersection(subspan)
+            next unless part
+
+            Hap.new(whole, part, true)
+          end
+        end
+      end
+    end
+
+    # Bjorklundアルゴリズム（ユークリッドリズム生成）
+    def self.bjorklund(pulses, steps)
+      return Array.new(steps, false) if pulses == 0
+      return Array.new(steps, true) if pulses >= steps
+
+      # 初期パターン: pulses個の[1]と(steps-pulses)個の[0]
+      groups = Array.new(pulses) { [true] } + Array.new(steps - pulses) { [false] }
+
+      loop do
+        # 末尾のグループと同じグループの数をカウント
+        last_group = groups.last
+        remainder_count = groups.count { |g| g == last_group }
+
+        # 残りが1つだけ、または全部同じなら終了
+        break if remainder_count <= 1 || remainder_count == groups.length
+
+        # 末尾から取り出して先頭のグループに追加
+        remainder_count.times do |i|
+          break if groups.length <= remainder_count
+
+          tail = groups.pop
+          groups[i] = groups[i] + tail
+        end
+      end
+
+      groups.flatten
+    end
+
     # ---- 変換メソッド ----
 
     # 速度を上げる
@@ -280,11 +343,62 @@ module Strudel
       end
     end
 
+    # ---- コントロールメソッド ----
+
+    # 音量を設定 (0.0 - 1.0)
+    def gain(value)
+      set_control(:gain, value)
+    end
+
+    # パンを設定 (0.0 = 左, 0.5 = 中央, 1.0 = 右)
+    def pan(value)
+      set_control(:pan, value)
+    end
+
+    # 再生速度を設定
+    def speed(value)
+      set_control(:speed, value)
+    end
+
+    # ローパスフィルターのカットオフ周波数を設定
+    def lpf(value)
+      set_control(:lpf, value)
+    end
+
+    # ハイパスフィルターのカットオフ周波数を設定
+    def hpf(value)
+      set_control(:hpf, value)
+    end
+
     def inspect
       "Pattern"
     end
 
     private
+
+    # コントロール値を設定（inner join方式でパターン対応）
+    def set_control(key, value)
+      value_pattern = self.class.reify(value)
+
+      Pattern.new do |state|
+        query(state).flat_map do |hap|
+          query_span = hap.whole || hap.part
+          value_haps = value_pattern.query(state.set_span(query_span))
+
+          value_haps.filter_map do |value_hap|
+            intersection = hap.part.intersection(value_hap.part)
+            next unless intersection
+
+            new_whole = if hap.whole && value_hap.whole
+                          hap.whole.intersection(value_hap.whole)
+                        end
+
+            new_value = hap.value.is_a?(Hash) ? hap.value.merge(key => value_hap.value) : { key => value_hap.value }
+            Hap.new(new_whole, intersection, new_value)
+          end
+        end
+      end
+    end
 
     # 二項演算を適用（inner join方式）
     def apply_op(other, &block)

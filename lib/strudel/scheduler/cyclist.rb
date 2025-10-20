@@ -97,8 +97,9 @@ module Strudel
         sample_data = @sample_bank.get(sound_name, sample_n)
         return if sample_data.empty?
 
+        speed = extract_speed(value)
         player = Audio::SamplePlayer.new(sample_data, @sample_rate)
-        player.trigger(gain: gain)
+        player.trigger(gain: gain, speed: speed)
         @active_players << player
       end
 
@@ -125,6 +126,12 @@ module Strudel
         return 60 unless value.is_a?(Hash) # Default: C4
 
         value[:note] || value[:n] || 60
+      end
+
+      def extract_speed(value)
+        return 1.0 unless value.is_a?(Hash)
+
+        value[:speed] || 1.0
       end
 
       def mix_players(frame_count)

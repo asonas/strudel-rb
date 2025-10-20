@@ -43,4 +43,78 @@ describe Strudel::DSL do
       assert_equal 67, haps[2].value[:note]
     end
   end
+
+  describe "#gain" do
+    it "creates a gain control pattern" do
+      pattern = sound("bd").gain(gain("1 2"))
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 2, haps.length
+      assert_equal 1.0, haps[0].value[:gain]
+      assert_equal 2.0, haps[1].value[:gain]
+    end
+  end
+
+  describe "#speed" do
+    it "creates a speed control pattern" do
+      pattern = sound("breaks").speed(speed("1 2"))
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 2, haps.length
+      assert_equal 1.0, haps[0].value[:speed]
+      assert_equal 2.0, haps[1].value[:speed]
+    end
+  end
+
+  describe "#pan" do
+    it "creates a pan control pattern" do
+      pattern = sound("bd").pan(pan("0 1"))
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 2, haps.length
+      assert_equal 0.0, haps[0].value[:pan]
+      assert_equal 1.0, haps[1].value[:pan]
+    end
+  end
+
+  describe "#euclid" do
+    it "creates euclidean rhythm pattern" do
+      pattern = euclid(3, 8)
+      haps = pattern.query_arc(0, 1)
+
+      # 3 hits in 8 steps = x..x..x.
+      assert_equal 3, haps.length
+    end
+
+    it "creates classic tresillo rhythm" do
+      pattern = euclid(3, 8)
+      haps = pattern.query_arc(0, 1)
+
+      # Positions: 0/8, 3/8, 6/8
+      assert_equal Rational(0, 8), haps[0].whole.begin_time.value
+      assert_equal Rational(3, 8), haps[1].whole.begin_time.value
+      assert_equal Rational(6, 8), haps[2].whole.begin_time.value
+    end
+  end
+
+  describe "#pure" do
+    it "creates a pure pattern" do
+      pattern = pure("bd")
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 1, haps.length
+      assert_equal "bd", haps.first.value
+    end
+  end
+
+  describe "#cat" do
+    it "is an alias for fastcat" do
+      pattern = cat(pure("bd"), pure("sd"))
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 2, haps.length
+      assert_equal "bd", haps[0].value
+      assert_equal "sd", haps[1].value
+    end
+  end
 end
