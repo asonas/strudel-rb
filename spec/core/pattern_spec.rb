@@ -377,4 +377,67 @@ describe Strudel::Pattern do
       assert_equal 69, haps.first.value[:note]
     end
   end
+
+  describe "#gain" do
+    it "sets gain control on pattern" do
+      pattern = Strudel::Pattern.pure({ s: "bd" }).gain(0.5)
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 0.5, haps.first.value[:gain]
+    end
+
+    it "accepts pattern for gain value" do
+      pattern = Strudel::Pattern.pure({ s: "bd" }).gain(
+        Strudel::Pattern.fastcat(0.5, 1.0)
+      )
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 2, haps.length
+      assert_equal 0.5, haps[0].value[:gain]
+      assert_equal 1.0, haps[1].value[:gain]
+    end
+  end
+
+  describe "#pan" do
+    it "sets pan control on pattern" do
+      pattern = Strudel::Pattern.pure({ s: "bd" }).pan(0.25)
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 0.25, haps.first.value[:pan]
+    end
+  end
+
+  describe "#speed" do
+    it "sets speed control on pattern" do
+      pattern = Strudel::Pattern.pure({ s: "breaks" }).speed(2.0)
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 2.0, haps.first.value[:speed]
+    end
+
+    it "accepts negative speed for reverse playback" do
+      pattern = Strudel::Pattern.pure({ s: "breaks" }).speed(-1.0)
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal(-1.0, haps.first.value[:speed])
+    end
+  end
+
+  describe "#lpf" do
+    it "sets lowpass filter cutoff" do
+      pattern = Strudel::Pattern.pure({ s: "bd" }).lpf(800)
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 800, haps.first.value[:lpf]
+    end
+  end
+
+  describe "#hpf" do
+    it "sets highpass filter cutoff" do
+      pattern = Strudel::Pattern.pure({ s: "bd" }).hpf(200)
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 200, haps.first.value[:hpf]
+    end
+  end
 end

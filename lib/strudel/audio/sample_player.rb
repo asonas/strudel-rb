@@ -11,16 +11,18 @@ module Strudel
         @position = 0.0
         @playing = false
         @gain = 1.0
+        @speed = 1.0
 
-        # サンプルレート変換の比率
-        @rate_ratio = sample_data.sample_rate.to_f / target_sample_rate
+        # サンプルレート変換の比率（ベース）
+        @base_rate_ratio = sample_data.sample_rate.to_f / target_sample_rate
       end
 
       # 再生開始
-      def trigger(gain: 1.0)
+      def trigger(gain: 1.0, speed: 1.0)
         @position = 0.0
         @playing = true
         @gain = gain
+        @speed = speed
       end
 
       # 再生停止
@@ -41,10 +43,13 @@ module Strudel
         samples = @sample_data.samples
         output = Array.new(frame_count, 0.0)
 
+        # スピードを考慮したレート比率
+        rate_ratio = @base_rate_ratio * @speed.abs
+
         frame_count.times do |i|
           idx = @position.to_i
 
-          if idx >= samples.length
+          if idx >= samples.length || idx < 0
             @playing = false
             break
           end
@@ -55,7 +60,8 @@ module Strudel
           next_sample = samples[idx + 1] || current
           output[i] = (current + (next_sample - current) * frac) * @gain
 
-          @position += @rate_ratio
+          # 逆再生（負のspeed）の場合は逆方向に進む
+          @position += @speed >= 0 ? rate_ratio : -rate_ratio
         end
 
         output
