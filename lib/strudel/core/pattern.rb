@@ -6,20 +6,20 @@ module Strudel
       @query = query
     end
 
-    # 状態に基づいてHapの配列を返す
+    # Returns an array of Haps based on the state
     def query(state)
       @query.call(state)
     end
 
-    # 時間範囲でクエリ（便利メソッド）
+    # Query by time range (convenience method)
     def query_arc(begin_time, end_time, controls = {})
       span = TimeSpan.new(begin_time, end_time)
       query(State.new(span, controls))
     end
 
-    # ---- ファクトリメソッド ----
+    # ---- Factory Methods ----
 
-    # 単一値のパターン（毎サイクル1回発生）
+    # Single value pattern (occurs once per cycle)
     def self.pure(value)
       Pattern.new do |state|
         state.span.span_cycles.map do |subspan|
@@ -29,31 +29,31 @@ module Strudel
       end
     end
 
-    # 無音パターン
+    # Silent pattern
     def self.silence
       Pattern.new { |_state| [] }
     end
 
-    # 値をパターンに変換（既にパターンならそのまま）
+    # Convert value to pattern (returns as-is if already a pattern)
     def self.reify(value)
       return value if value.is_a?(Pattern)
 
       pure(value)
     end
 
-    # シーケンス（1サイクル内で全てのパターンを再生）
+    # Sequence (plays all patterns within one cycle)
     def self.fastcat(*items)
       return silence if items.empty?
 
       slowcat(*items).fast(items.length)
     end
 
-    # シーケンス（fastcatのエイリアス）
+    # Sequence (alias for fastcat)
     def self.sequence(*items)
       fastcat(*items)
     end
 
-    # 1サイクルに1つずつ再生
+    # Plays one item per cycle
     def self.slowcat(*items)
       return silence if items.empty?
 
@@ -69,7 +69,7 @@ module Strudel
       end
     end
 
-    # 並列再生（スタック）
+    # Parallel playback (stack)
     def self.stack(*items)
       return silence if items.empty?
 
@@ -80,23 +80,23 @@ module Strudel
       end
     end
 
-    # ユークリッドリズム
+    # Euclidean rhythm
     def self.euclid(pulses, steps, rotation = 0)
       return silence if pulses <= 0 || steps <= 0
 
-      # Bjorklundアルゴリズムでビートパターンを生成
+      # Generate beat pattern using Bjorklund algorithm
       pattern_array = bjorklund(pulses, steps)
 
-      # rotationを適用
+      # Apply rotation
       pattern_array = pattern_array.rotate(rotation) if rotation != 0
 
-      # ビートの位置を計算
+      # Calculate beat positions
       step_duration = Rational(1, steps)
       beats = pattern_array.each_with_index.filter_map do |beat, i|
         beat ? i : nil
       end
 
-      # パターンを生成
+      # Generate pattern
       Pattern.new do |state|
         state.span.span_cycles.flat_map do |subspan|
           cycle = subspan.begin_time.sam
@@ -115,23 +115,23 @@ module Strudel
       end
     end
 
-    # Bjorklundアルゴリズム（ユークリッドリズム生成）
+    # Bjorklund algorithm (Euclidean rhythm generation)
     def self.bjorklund(pulses, steps)
       return Array.new(steps, false) if pulses == 0
       return Array.new(steps, true) if pulses >= steps
 
-      # 初期パターン: pulses個の[1]と(steps-pulses)個の[0]
+      # Initial pattern: pulses number of [1] and (steps-pulses) number of [0]
       groups = Array.new(pulses) { [true] } + Array.new(steps - pulses) { [false] }
 
       loop do
-        # 末尾のグループと同じグループの数をカウント
+        # Count groups that are the same as the last group
         last_group = groups.last
         remainder_count = groups.count { |g| g == last_group }
 
-        # 残りが1つだけ、または全部同じなら終了
+        # Exit if only one remainder or all groups are the same
         break if remainder_count <= 1 || remainder_count == groups.length
 
-        # 末尾から取り出して先頭のグループに追加
+        # Pop from the end and append to the beginning groups
         remainder_count.times do |i|
           break if groups.length <= remainder_count
 
@@ -143,9 +143,9 @@ module Strudel
       groups.flatten
     end
 
-    # ---- 変換メソッド ----
+    # ---- Transformation Methods ----
 
-    # 速度を上げる
+    # Increase speed
     def fast(factor)
       factor = Fraction.new(factor) unless factor.is_a?(Fraction)
 
@@ -153,36 +153,36 @@ module Strudel
         .with_hap_time { |t| t / factor }
     end
 
-    # 速度を下げる
+    # Decrease speed
     def slow(factor)
       fast(Fraction.new(1) / Fraction.new(factor))
     end
 
-    # 値を変換
+    # Transform values
     def with_value(&block)
       Pattern.new do |state|
         query(state).map { |hap| hap.with_value(&block) }
       end
     end
 
-    # fmap（with_valueのエイリアス）
+    # fmap (alias for with_value)
     def fmap(&block)
       with_value(&block)
     end
 
-    # Hapをフィルタリング
+    # Filter Haps
     def filter_haps(&predicate)
       Pattern.new do |state|
         query(state).select(&predicate)
       end
     end
 
-    # onsetがあるHapのみ
+    # Only Haps with onset
     def onsets_only
       filter_haps(&:has_onset?)
     end
 
-    # クエリ時間を変換
+    # Transform query time
     def with_query_time(&block)
       Pattern.new do |state|
         new_span = state.span.with_time(&block)
@@ -190,7 +190,7 @@ module Strudel
       end
     end
 
-    # Hapの時間を変換
+    # Transform Hap time
     def with_hap_time(&block)
       Pattern.new do |state|
         query(state).map do |hap|
@@ -199,7 +199,7 @@ module Strudel
       end
     end
 
-    # サイクル境界でクエリを分割
+    # Split queries at cycle boundaries
     def split_queries
       Pattern.new do |state|
         state.span.span_cycles.flat_map do |subspan|
@@ -208,29 +208,29 @@ module Strudel
       end
     end
 
-    # ---- 算術メソッド ----
+    # ---- Arithmetic Methods ----
 
-    # パターンの値を加算
+    # Add pattern values
     def add(other)
       apply_op(other) { |a, b| a + b }
     end
 
-    # パターンの値を減算
+    # Subtract pattern values
     def sub(other)
       apply_op(other) { |a, b| a - b }
     end
 
-    # パターンの値を乗算
+    # Multiply pattern values
     def mul(other)
       apply_op(other) { |a, b| a * b }
     end
 
-    # パターンの値を除算
+    # Divide pattern values
     def div(other)
       apply_op(other) { |a, b| a / b }
     end
 
-    # サンプルをサイクルの長さに合わせる
+    # Fit sample to cycle length
     def fit
       Pattern.new do |state|
         query(state).map do |hap|
@@ -249,7 +249,7 @@ module Strudel
       end
     end
 
-    # n回ごとに関数を適用
+    # Apply function every n cycles
     def every(n, &func)
       Pattern.new do |state|
         state.span.span_cycles.flat_map do |subspan|
@@ -260,30 +260,30 @@ module Strudel
       end
     end
 
-    # パターンを逆再生
+    # Reverse pattern playback
     def rev
       split_queries.then do |pat|
         Pattern.new do |state|
           span = state.span
           cycle = span.begin_time.sam
 
-          # サイクル内での位置を反転する関数
+          # Function to reflect position within cycle
           reflect_in_cycle = lambda do |t, base_cycle|
             pos = t.value - base_cycle.value
-            # 1を超える場合（次のサイクル）は調整
+            # Adjust if exceeding 1 (next cycle)
             pos = 1 if pos == 0 && t != base_cycle
             Fraction.new(base_cycle.value + (1 - pos))
           end
 
-          # 反転した範囲を計算
+          # Calculate reflected range
           reflected_begin = reflect_in_cycle.call(span.end_time, cycle)
           reflected_end = reflect_in_cycle.call(span.begin_time, cycle)
           reflected_span = TimeSpan.new(reflected_begin, reflected_end)
 
-          # 反転した範囲でクエリ
+          # Query with reflected range
           haps = pat.query(state.set_span(reflected_span))
 
-          # 結果のhapsの時間を反転
+          # Reflect time in result haps
           haps.map do |hap|
             hap_cycle = hap.whole&.begin_time&.sam || hap.part.begin_time.sam
 
@@ -303,7 +303,7 @@ module Strudel
       end
     end
 
-    # ノートを移調（セミトーン単位）
+    # Transpose notes (in semitones)
     def trans(semitones)
       semitones_pattern = self.class.reify(semitones)
 
@@ -332,7 +332,7 @@ module Strudel
       end
     end
 
-    # スケール度数をノートに変換
+    # Convert scale degrees to notes
     def scale(scale_spec)
       root, scale_name = Theory::Scale.parse_scale_name(scale_spec)
       base_note = 60 + root # C4 = 60 + root offset
@@ -343,29 +343,29 @@ module Strudel
       end
     end
 
-    # ---- コントロールメソッド ----
+    # ---- Control Methods ----
 
-    # 音量を設定 (0.0 - 1.0)
+    # Set volume (0.0 - 1.0)
     def gain(value)
       set_control(:gain, value)
     end
 
-    # パンを設定 (0.0 = 左, 0.5 = 中央, 1.0 = 右)
+    # Set pan (0.0 = left, 0.5 = center, 1.0 = right)
     def pan(value)
       set_control(:pan, value)
     end
 
-    # 再生速度を設定
+    # Set playback speed
     def speed(value)
       set_control(:speed, value)
     end
 
-    # ローパスフィルターのカットオフ周波数を設定
+    # Set low-pass filter cutoff frequency
     def lpf(value)
       set_control(:lpf, value)
     end
 
-    # ハイパスフィルターのカットオフ周波数を設定
+    # Set high-pass filter cutoff frequency
     def hpf(value)
       set_control(:hpf, value)
     end
@@ -376,7 +376,7 @@ module Strudel
 
     private
 
-    # コントロール値を設定（inner join方式でパターン対応）
+    # Set control value (pattern-aware with inner join)
     def set_control(key, value)
       value_pattern = self.class.reify(value)
 
@@ -400,27 +400,27 @@ module Strudel
       end
     end
 
-    # 二項演算を適用（inner join方式）
+    # Apply binary operation (inner join)
     def apply_op(other, &block)
       other_pattern = self.class.reify(other)
 
       Pattern.new do |state|
         query(state).flat_map do |hap_left|
-          # 左のHapのwholeの時間範囲で右のパターンをクエリ
+          # Query right pattern with left Hap's whole time range
           query_span = hap_left.whole || hap_left.part
           right_haps = other_pattern.query(state.set_span(query_span))
 
           right_haps.filter_map do |hap_right|
-            # 2つのHapの時間範囲が重なる部分を計算
+            # Calculate overlapping part of two Haps' time ranges
             intersection = hap_left.part.intersection(hap_right.part)
             next unless intersection
 
-            # 新しいwhole（両方のwholeの交差）
+            # New whole (intersection of both wholes)
             new_whole = if hap_left.whole && hap_right.whole
                           hap_left.whole.intersection(hap_right.whole)
                         end
 
-            # 値を演算で結合
+            # Combine values with operation
             new_value = block.call(hap_left.value, hap_right.value)
             Hap.new(new_whole, intersection, new_value)
           end

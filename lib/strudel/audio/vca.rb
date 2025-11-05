@@ -40,10 +40,10 @@ module Strudel
       def process(input, output, frame_count, time_info, status_flags, user_data)
         samples = @generator.generate(frame_count)
 
-        # モノラル→ステレオ変換
+        # Mono to stereo conversion
         stereo_samples = []
         samples.each do |sample|
-          # クリッピング防止
+          # Clipping prevention
           clamped = sample.clamp(-1.0, 1.0)
           stereo_samples << clamped # left
           stereo_samples << clamped # right

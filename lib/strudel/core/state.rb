@@ -9,12 +9,12 @@ module Strudel
       @controls = controls
     end
 
-    # 新しいspanでStateを作成
+    # Create a State with a new span
     def set_span(new_span)
       State.new(new_span, @controls)
     end
 
-    # 新しいcontrolsでStateを作成
+    # Create a State with new controls
     def set_controls(new_controls)
       State.new(@span, new_controls)
     end

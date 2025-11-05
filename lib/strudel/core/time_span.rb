@@ -9,17 +9,17 @@ module Strudel
       @end_time = end_time.is_a?(Fraction) ? end_time : Fraction.new(end_time)
     end
 
-    # 時間の長さ
+    # Duration of the time span
     def duration
       @end_time - @begin_time
     end
 
-    # 中間点
+    # Midpoint
     def midpoint
       @begin_time + (duration / Fraction.new(2))
     end
 
-    # サイクル境界で分割した配列を返す
+    # Returns an array of time spans split at cycle boundaries
     def span_cycles
       return [] if @end_time <= @begin_time
 
@@ -36,7 +36,7 @@ module Strudel
       result
     end
 
-    # 2つの時間区間の交差部分を返す
+    # Returns the intersection of two time spans
     def intersection(other)
       new_begin = [@begin_time, other.begin_time].max
       new_end = [@end_time, other.end_time].min
@@ -46,12 +46,12 @@ module Strudel
       TimeSpan.new(new_begin, new_end)
     end
 
-    # サイクル内での位置に正規化
+    # Normalize to position within the cycle
     def cycle_arc
       TimeSpan.new(@begin_time.cycle_pos, @begin_time.cycle_pos + duration)
     end
 
-    # 時間に関数を適用
+    # Apply a function to time values
     def with_time(&block)
       TimeSpan.new(block.call(@begin_time), block.call(@end_time))
     end

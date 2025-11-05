@@ -10,19 +10,19 @@ module Strudel
         @cache = {}
       end
 
-      # サンプルを取得（キャッシュ付き）
+      # Get sample (with caching)
       def get(name, n = 0)
         key = "#{name}:#{n}"
         @cache[key] ||= load_sample(name, n)
       end
 
-      # サンプルが存在するか確認
+      # Check if sample exists
       def exists?(name, n = 0)
         path = sample_path(name, n)
         File.exist?(path)
       end
 
-      # 利用可能なサンプル名一覧
+      # List available sample names
       def available_samples
         return [] unless Dir.exist?(@samples_path)
 
@@ -55,14 +55,14 @@ module Strudel
           buffer = reader.read(reader.total_sample_frames)
           reader.close
 
-          # モノラルに変換（ステレオの場合は左チャンネルのみ使用）
+          # Convert to mono (use left channel only for stereo)
           samples = if format.channels == 1
                       buffer.samples
                     else
                       buffer.samples.map { |frame| frame[0] }
                     end
 
-          # Float32に正規化
+          # Normalize to Float32
           normalized = normalize_samples(samples, format.bits_per_sample)
 
           SampleData.new(normalized, format.sample_rate)
@@ -78,7 +78,7 @@ module Strudel
       end
     end
 
-    # サンプルデータを保持するクラス
+    # Class to hold sample data
     class SampleData
       attr_reader :samples, :sample_rate
 
