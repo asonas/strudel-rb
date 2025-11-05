@@ -4,87 +4,87 @@ require "parslet"
 
 module Strudel
   module Mini
-    # Mini-Notation文法パーサー
+    # Mini-Notation grammar parser
     class Grammar < Parslet::Parser
-      # 空白
+      # Whitespace
       rule(:space) { match('\s').repeat(1) }
       rule(:space?) { space.maybe }
 
-      # アトム（サウンド名、ノート名を含む - シャープ/フラット対応）
+      # Atom (sound name, note name including sharps/flats)
       rule(:atom_char) { match('[a-zA-Z0-9_#]') }
       rule(:atom_name) { atom_char.repeat(1).as(:name) }
 
-      # サンプル番号 (:n)
+      # Sample number (:n)
       rule(:sample_number) { str(":") >> match('[0-9]').repeat(1).as(:n) }
 
-      # アトム（名前 + オプションのサンプル番号）
+      # Atom (name + optional sample number)
       rule(:atom) do
         (atom_name >> sample_number.maybe).as(:atom)
       end
 
-      # 休符
+      # Rest
       rule(:rest) { (str("~") | str("-")).as(:rest) }
 
-      # 乗算 (*n)
+      # Multiplier (*n)
       rule(:multiplier) { str("*") >> match('[0-9.]').repeat(1).as(:mult) }
 
-      # 基本要素（アトム、休符、またはグループ）
+      # Basic element (atom, rest, or group)
       rule(:element) do
         (
           (atom | rest | group | angle_group) >> multiplier.maybe
         ).as(:element)
       end
 
-      # 角括弧グループ [...]
+      # Square bracket group [...]
       rule(:group) do
         str("[") >> space? >> pattern >> space? >> str("]")
       end
 
-      # 山括弧グループ <...>（スローキャット）
+      # Angle bracket group <...> (slowcat)
       rule(:angle_group) do
         (str("<") >> space? >> sequence >> space? >> str(">")).as(:slowcat)
       end
 
-      # シーケンス（スペース区切り）
+      # Sequence (space-separated)
       rule(:sequence) do
         (element >> (space >> element).repeat).as(:sequence)
       end
 
-      # スタック（カンマ区切り）
+      # Stack (comma-separated)
       rule(:stack) do
         (sequence >> (space? >> str(",") >> space? >> sequence).repeat(1)).as(:stack)
       end
 
-      # パターン（スタックまたはシーケンス）
+      # Pattern (stack or sequence)
       rule(:pattern) do
         stack | sequence
       end
 
-      # ルート
+      # Root
       root(:pattern)
     end
 
-    # AST変換器
+    # AST transformer
     class Transform < Parslet::Transform
-      # 休符
+      # Rest
       rule(rest: simple(:_)) { nil }
 
-      # アトム（名前のみ）
+      # Atom (name only)
       rule(atom: { name: simple(:name) }) do
         name.to_s
       end
 
-      # アトム（名前 + サンプル番号）
+      # Atom (name + sample number)
       rule(atom: { name: simple(:name), n: simple(:n) }) do
         { s: name.to_s, n: n.to_s.to_i }
       end
 
-      # 要素（乗算なし）
+      # Element (without multiplier)
       rule(element: subtree(:content)) do
         content
       end
 
-      # 要素（乗算あり）
+      # Element (with multiplier)
       rule(element: { atom: subtree(:atom_content), mult: simple(:mult) }) do
         { atom: atom_content, mult: mult.to_s.to_f }
       end
@@ -101,23 +101,23 @@ module Strudel
         { slowcat: cat }
       end
 
-      # シーケンス
+      # Sequence
       rule(sequence: subtree(:items)) do
         items.is_a?(Array) ? { sequence: items } : items
       end
 
-      # スタック
+      # Stack
       rule(stack: subtree(:items)) do
         { stack: items.is_a?(Array) ? items : [items] }
       end
 
-      # スローキャット
+      # Slowcat
       rule(slowcat: { sequence: subtree(:items) }) do
         { slowcat: items.is_a?(Array) ? items : [items] }
       end
     end
 
-    # パーサー本体
+    # Parser implementation
     class Parser
       def initialize
         @grammar = Grammar.new
@@ -140,10 +140,10 @@ module Strudel
           Pattern.pure(ast)
         when Hash
           if ast[:s]
-            # サンプル番号付きアトム
+            # Atom with sample number
             Pattern.pure(ast)
           elsif ast[:sequence] && ast[:mult]
-            # 乗算付きシーケンス（サブシーケンス）
+            # Sequence with multiplier (sub-sequence)
             pattern = sequence_to_pattern(ast[:sequence])
             pattern.fast(ast[:mult])
           elsif ast[:sequence]
@@ -153,21 +153,21 @@ module Strudel
           elsif ast[:slowcat]
             slowcat_to_pattern(ast[:slowcat])
           elsif ast[:atom]
-            # 乗算付きアトム
+            # Atom with multiplier
             pattern = ast_to_pattern(process_atom(ast[:atom]))
             ast[:mult] ? pattern.fast(ast[:mult]) : pattern
           elsif ast[:rest]
-            # 乗算付き休符
+            # Rest with multiplier
             Pattern.silence
           elsif ast[:mult]
-            # その他の乗算
+            # Other multiplier cases
             pattern = ast_to_pattern(ast.reject { |k, _| k == :mult })
             pattern.fast(ast[:mult])
           else
             Pattern.silence
           end
         when Array
-          # 配列は暗黙のシーケンス
+          # Array is an implicit sequence
           sequence_to_pattern(ast)
         when NilClass
           Pattern.silence
@@ -199,7 +199,7 @@ module Strudel
 
       def stack_to_pattern(items)
         items = [items] unless items.is_a?(Array)
-        # スタック内の各アイテムはシーケンスである可能性がある
+        # Each item in the stack may be a sequence
         patterns = items.map do |item|
           if item.is_a?(Hash) && item[:sequence]
             sequence_to_pattern(item[:sequence])

@@ -10,27 +10,27 @@ module Strudel
       @value = value.is_a?(Rational) ? value : Rational(value)
     end
 
-    # サイクルの開始時刻（floor）
+    # Cycle start time (floor)
     def sam
       Fraction.new(@value.floor)
     end
 
-    # 次のサイクルの開始時刻
+    # Next cycle start time
     def next_sam
       sam + Fraction.new(1)
     end
 
-    # サイクル内での相対位置
+    # Relative position within the cycle
     def cycle_pos
       self - sam
     end
 
-    # このサイクル全体のTimeSpan
+    # TimeSpan for the entire cycle
     def whole_cycle
       TimeSpan.new(sam, next_sam)
     end
 
-    # 算術演算
+    # Arithmetic operations
     def +(other)
       other_value = other.is_a?(Fraction) ? other.value : Rational(other)
       Fraction.new(@value + other_value)
@@ -51,7 +51,7 @@ module Strudel
       Fraction.new(@value / other_value)
     end
 
-    # 比較演算
+    # Comparison operations
     def <=>(other)
       other_value = other.is_a?(Fraction) ? other.value : Rational(other)
       @value <=> other_value
@@ -71,7 +71,7 @@ module Strudel
       @value.hash
     end
 
-    # 変換
+    # Conversion
     def to_f
       @value.to_f
     end

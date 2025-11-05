@@ -11,31 +11,31 @@ module Strudel
       @context = context
     end
 
-    # イベントの開始点かどうか（part.beginがwhole.beginと一致）
+    # Whether this is an onset (part.begin matches whole.begin)
     def has_onset?
       return false if @whole.nil?
 
       @whole.begin_time == @part.begin_time
     end
 
-    # 値を変換した新しいHapを返す
+    # Returns a new Hap with transformed value
     def with_value(&block)
       Hap.new(@whole, @part, block.call(@value), @context)
     end
 
-    # 時間区間を変換した新しいHapを返す
+    # Returns a new Hap with transformed time span
     def with_span(&block)
       new_whole = @whole ? block.call(@whole) : nil
       new_part = block.call(@part)
       Hap.new(new_whole, new_part, @value, @context)
     end
 
-    # イベントの長さ
+    # Event duration
     def duration
       (@whole || @part).duration
     end
 
-    # partでの長さ
+    # Duration of the part
     def part_duration
       @part.duration
     end

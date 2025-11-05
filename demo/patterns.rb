@@ -1,9 +1,9 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# strudel-rb デモ: 様々なパターン
+# strudel-rb Demo: Various Patterns
 #
-# 使い方:
+# Usage:
 #   bundle exec ruby demo/patterns.rb
 
 require_relative "../lib/strudel"
@@ -20,21 +20,21 @@ puts "strudel-rb Demo: Patterns"
 puts "========================="
 puts ""
 
-# パターンの例
+# Pattern examples
 patterns = [
-  # 基本シーケンス
+  # Basic sequence
   ['sound("bd hh sd hh")', runner.sound("bd hh sd hh")],
 
-  # サブシーケンス
+  # Sub-sequence
   ['sound("bd [hh hh] sd [hh bd]")', runner.sound("bd [hh hh] sd [hh bd]")],
 
-  # 乗算（速度変更）
+  # Multiplication (speed change)
   ['sound("bd hh*2 sd hh*3")', runner.sound("bd hh*2 sd hh*3")],
 
-  # 休符
+  # Rests
   ['sound("bd - sd -")', runner.sound("bd - sd -")],
 
-  # 並列（スタック）
+  # Parallel (stack)
   ['sound("bd sd, hh hh hh hh")', runner.sound("bd sd, hh hh hh hh")],
 ]
 

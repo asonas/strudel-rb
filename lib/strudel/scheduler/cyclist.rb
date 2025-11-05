@@ -6,7 +6,7 @@ module Strudel
       attr_accessor :cps, :pattern
       attr_reader :sample_rate
 
-      DEFAULT_CPS = 0.5 # cycles per second (1サイクル = 2秒)
+      DEFAULT_CPS = 0.5 # cycles per second (1 cycle = 2 seconds)
       DEFAULT_SAMPLE_RATE = 44_100
       SYNTH_WAVEFORMS = %w[sine sawtooth square triangle].freeze
 
@@ -20,28 +20,28 @@ module Strudel
         @mutex = Mutex.new
       end
 
-      # パターンを設定
+      # Set the pattern
       def set_pattern(pattern)
         @mutex.synchronize do
           @pattern = pattern
         end
       end
 
-      # オーディオフレームを生成（VCAから呼ばれる）
+      # Generate audio frames (called by VCA)
       def generate(frame_count)
         @mutex.synchronize do
-          # フレーム数をサイクル数に変換
+          # Convert frame count to cycle count
           frames_per_cycle = @sample_rate / @cps
           duration_in_cycles = Fraction.new(Rational(frame_count, frames_per_cycle.to_i))
 
           end_cycle = @current_cycle + duration_in_cycles
 
-          # パターンをクエリしてHapを取得
+          # Query pattern to get Haps
           if @pattern
             begin
               haps = @pattern.query_arc(@current_cycle.value, end_cycle.value)
 
-              # onsetがあるHapの音をトリガー
+              # Trigger sounds for Haps with onset
               haps.select(&:has_onset?).each do |hap|
                 trigger_sound(hap)
               end
@@ -50,10 +50,10 @@ module Strudel
             end
           end
 
-          # アクティブなプレイヤーからサンプルを生成してミックス
+          # Generate and mix samples from active players
           samples = mix_players(frame_count)
 
-          # 終了したプレイヤーを削除
+          # Remove finished players
           @active_players.reject! { |p| !p.playing? }
 
           @current_cycle = end_cycle
@@ -61,7 +61,7 @@ module Strudel
         end
       end
 
-      # サイクル位置をリセット
+      # Reset cycle position
       def reset
         @mutex.synchronize do
           @current_cycle = Fraction.new(0)
@@ -74,13 +74,13 @@ module Strudel
       def trigger_sound(hap)
         value = hap.value
 
-        # 値からサウンド名とサンプル番号を抽出
+        # Extract sound name and sample number from value
         sound_name, sample_n = extract_sound_info(value)
         return unless sound_name
 
         gain = extract_gain(value)
 
-        # シンセの場合
+        # For synth sounds
         if SYNTH_WAVEFORMS.include?(sound_name)
           player = Audio::SynthPlayer.new(
             sound_name.to_sym,
@@ -93,7 +93,7 @@ module Strudel
           return
         end
 
-        # サンプルの場合
+        # For sample sounds
         sample_data = @sample_bank.get(sound_name, sample_n)
         return if sample_data.empty?
 
@@ -137,10 +137,10 @@ module Strudel
       def mix_players(frame_count)
         return Array.new(frame_count, 0.0) if @active_players.empty?
 
-        # 各プレイヤーからサンプルを取得
+        # Get samples from each player
         player_outputs = @active_players.map { |p| p.generate(frame_count) }
 
-        # ミックス
+        # Mix
         mixed = Array.new(frame_count, 0.0)
         player_outputs.each do |output|
           frame_count.times do |i|
@@ -148,7 +148,7 @@ module Strudel
           end
         end
 
-        # ゲイン調整（同時発音数に応じて）
+        # Gain adjustment (based on number of simultaneous sounds)
         active_count = @active_players.count(&:playing?)
         if active_count > 1
           gain = 1.0 / Math.sqrt(active_count)
