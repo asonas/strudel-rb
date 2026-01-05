@@ -8,7 +8,7 @@ module Strudel
       include FFI::PortAudio
 
       SAMPLE_RATE = 44_100
-      BUFFER_SIZE = 256
+      BUFFER_SIZE = 1024  # Larger buffer to prevent underrun (was 256)
 
       def initialize(generator, sample_rate: SAMPLE_RATE, buffer_size: BUFFER_SIZE)
         @generator = generator
@@ -29,7 +29,7 @@ module Strudel
       def stop
         return unless @running
 
-        super
+        API.Pa_StopStream(@stream.read_pointer)
         @running = false
       end
 
