@@ -21,9 +21,12 @@ module Strudel
     alias_method :s, :sound
 
     # Notation like n("0 1 2 3").sound("jazz")
+    # Also used for scale degrees: n("<0 4 7>").scale("c:minor")
     def n(pattern_string)
       pattern = Mini::Parser.new.parse(pattern_string)
-      pattern.with_value { |v| { n: v.to_i } }
+      pattern.with_value do |v|
+        v.nil? ? nil : v.to_i
+      end
     end
 
     # Notation like note("c4 e4 g4")
@@ -92,6 +95,40 @@ module Strudel
     def euclid(pulses, steps, rotation = 0)
       Pattern.euclid(pulses, steps, rotation)
     end
+
+    # Random pattern (0.0 to 1.0)
+    # Returns a different random value for each event
+    def rand
+      Pattern.new do |state|
+        state.span.span_cycles.map do |subspan|
+          whole = subspan.begin_time.whole_cycle
+          # Use cycle position as seed for reproducible randomness
+          seed = (whole.begin_time.value * 1000).to_i
+          random_value = Random.new(seed).rand
+          Hap.new(whole, subspan, random_value)
+        end
+      end
+    end
+
+    # Integer random pattern (0 to n-1)
+    def irand(n)
+      rand.fmap { |v| (v * n).to_i }
+    end
+
+    # Register a custom function on Pattern
+    # Usage:
+    #   register(:acidenv) do |x, pat|
+    #     pat.lpf(800)
+    #   end
+    #
+    #   n("0 4 7").s("sawtooth").acidenv(0.6)
+    def register(name, &block)
+      Pattern.define_method(name) do |*args|
+        block.call(*args, self)
+      end
+    end
+
+    module_function :register
   end
 
   # Runner class: Makes it easy to play patterns using DSL
