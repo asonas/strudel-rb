@@ -230,6 +230,11 @@ module Strudel
       apply_op(other) { |a, b| a / b }
     end
 
+    # Power pattern values
+    def pow(other)
+      apply_op(other) { |a, b| a**b }
+    end
+
     # Fit sample to cycle length
     def fit
       Pattern.new do |state|
@@ -345,6 +350,13 @@ module Strudel
 
     # ---- Control Methods ----
 
+    # Set sound source (waveform or sample name)
+    def s(sound_name)
+      set_control(:s, sound_name)
+    end
+
+    alias_method :sound, :s
+
     # Set volume (0.0 - 1.0)
     def gain(value)
       set_control(:gain, value)
@@ -360,15 +372,58 @@ module Strudel
       set_control(:speed, value)
     end
 
-    # Set low-pass filter cutoff frequency
+    # Set low-pass filter cutoff frequency (Hz)
     def lpf(value)
       set_control(:lpf, value)
+    end
+
+    # Set low-pass filter envelope amount (how much the envelope opens the filter)
+    def lpenv(value)
+      set_control(:lpenv, value)
+    end
+
+    # Set low-pass filter envelope attack time (seconds)
+    def lpa(value)
+      set_control(:lpa, value)
+    end
+
+    # Set low-pass filter envelope decay time (seconds)
+    def lpd(value)
+      set_control(:lpd, value)
+    end
+
+    # Set low-pass filter envelope sustain level (0.0 - 1.0)
+    def lps(value)
+      set_control(:lps, value)
+    end
+
+    # Set low-pass filter envelope release time (seconds)
+    def lpr(value)
+      set_control(:lpr, value)
+    end
+
+    # Set low-pass filter resonance (Q value, 0.0 - 1.0)
+    def lpq(value)
+      set_control(:lpq, value)
     end
 
     # Set high-pass filter cutoff frequency
     def hpf(value)
       set_control(:hpf, value)
     end
+
+    # Set detune amount (for supersaw, etc.)
+    def detune(value)
+      set_control(:detune, value)
+    end
+
+    # Set orbit (audio routing channel)
+    def orbit(value)
+      set_control(:orbit, value)
+    end
+
+    # Alias for orbit
+    alias_method :o, :orbit
 
     def inspect
       "Pattern"

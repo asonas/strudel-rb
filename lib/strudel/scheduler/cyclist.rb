@@ -8,7 +8,7 @@ module Strudel
 
       DEFAULT_CPS = 0.5 # cycles per second (1 cycle = 2 seconds)
       DEFAULT_SAMPLE_RATE = 44_100
-      SYNTH_WAVEFORMS = %w[sine sawtooth square triangle].freeze
+      SYNTH_WAVEFORMS = %w[sine sawtooth square triangle supersaw].freeze
 
       def initialize(sample_rate: DEFAULT_SAMPLE_RATE, cps: DEFAULT_CPS, samples_path: nil)
         @sample_rate = sample_rate
@@ -82,13 +82,21 @@ module Strudel
 
         # For synth sounds
         if SYNTH_WAVEFORMS.include?(sound_name)
+          detune = extract_detune(value)
+          lpf_params = extract_lpf_params(value)
+
           player = Audio::SynthPlayer.new(
             sound_name.to_sym,
             sample_rate: @sample_rate,
-            gain: gain
+            gain: gain,
+            detune: detune
           )
           note = extract_note(value)
-          player.trigger(note: note)
+          player.trigger(
+            note: note,
+            detune: detune,
+            **lpf_params
+          )
           @active_players << player
           return
         end
@@ -134,6 +142,26 @@ module Strudel
         value[:speed] || 1.0
       end
 
+      def extract_detune(value)
+        return nil unless value.is_a?(Hash)
+
+        value[:detune]
+      end
+
+      def extract_lpf_params(value)
+        return {} unless value.is_a?(Hash)
+
+        params = {}
+        params[:lpf] = value[:lpf] if value[:lpf]
+        params[:lpq] = value[:lpq] if value[:lpq]
+        params[:lpenv] = value[:lpenv] if value[:lpenv]
+        params[:lpa] = value[:lpa] if value[:lpa]
+        params[:lpd] = value[:lpd] if value[:lpd]
+        params[:lps] = value[:lps] if value[:lps]
+        params[:lpr] = value[:lpr] if value[:lpr]
+        params
+      end
+
       def mix_players(frame_count)
         return Array.new(frame_count, 0.0) if @active_players.empty?
 
@@ -144,18 +172,35 @@ module Strudel
         mixed = Array.new(frame_count, 0.0)
         player_outputs.each do |output|
           frame_count.times do |i|
-            mixed[i] += output[i]
+            mixed[i] += output[i] if output[i]
           end
         end
 
-        # Gain adjustment (based on number of simultaneous sounds)
+        # Calculate target gain based on number of simultaneous sounds
         active_count = @active_players.count(&:playing?)
-        if active_count > 1
-          gain = 1.0 / Math.sqrt(active_count)
-          mixed.map! { |s| s * gain }
+        target_gain = active_count > 1 ? 1.0 / Math.sqrt(active_count) : 1.0
+
+        # Initialize smoothed gain if not set
+        @smoothed_gain ||= target_gain
+
+        # Apply gain with smoothing to prevent clicks
+        mixed.map!.with_index do |s, i|
+          # Smooth gain changes over the buffer
+          @smoothed_gain = @smoothed_gain * 0.999 + target_gain * 0.001
+          # Soft limiter (tanh) to prevent harsh clipping
+          soft_limit(s * @smoothed_gain)
         end
 
         mixed
+      end
+
+      # Soft limiter using tanh - smoother than hard clipping
+      def soft_limit(sample)
+        if sample.abs > 0.8
+          Math.tanh(sample)
+        else
+          sample
+        end
       end
     end
   end
