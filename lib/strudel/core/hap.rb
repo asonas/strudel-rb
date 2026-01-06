@@ -35,11 +35,6 @@ module Strudel
       (@whole || @part).duration
     end
 
-    # Duration of the part
-    def part_duration
-      @part.duration
-    end
-
     def ==(other)
       return false unless other.is_a?(Hap)
 

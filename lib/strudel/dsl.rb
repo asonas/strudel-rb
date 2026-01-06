@@ -2,6 +2,96 @@
 
 module Strudel
   module DSL
+    TrackEntry = Data.define(:name, :pattern, :muted)
+
+    # ---- Track DSL (Strudel-like $:) ----
+    #
+    # In Strudel, `$:` definitions are automatically stacked and can be muted with `_$:`.
+    # Ruby cannot override `$:` (it's $LOAD_PATH), so we provide `track` / `_track` instead.
+    #
+    # Example:
+    #   track { sound("bd") }
+    #   _track { sound("hh") } # muted
+    #   tracks # => Pattern.stack(...)
+    def track(name = nil, &block)
+      register_track(name, muted: false, &block)
+    end
+
+    def _track(name = nil, &block)
+      register_track(name, muted: true, &block)
+    end
+
+    # Returns a pattern composed of all non-muted tracks.
+    #
+    # In live coding, a single broken track shouldn't silence the whole session.
+    # We therefore query tracks independently and drop only the failing one.
+    def tracks
+      entries = track_registry.values.reject(&:muted)
+      return Pattern.silence if entries.empty?
+
+      Pattern.new do |state|
+        entries.flat_map do |entry|
+          begin
+            entry.pattern.query(state)
+          rescue StandardError => e
+            warn "[#{entry.name}] Error querying track: #{e.class}: #{e.message}"
+            []
+          end
+        end
+      end
+    end
+
+    # Clears track registry (useful for live reload).
+    def clear_tracks
+      @track_registry = {}
+      @track_auto_index = 0
+    end
+
+    def track_registry
+      @track_registry ||= {}
+    end
+
+    def next_track_name
+      @track_auto_index ||= 0
+      @track_auto_index += 1
+      :"track#{@track_auto_index}"
+    end
+
+    def register_track(name, muted:, &block)
+      raise ArgumentError, "block is required" unless block
+
+      name ||= next_track_name
+      pat = instance_exec(&block)
+      unless pat.is_a?(Pattern)
+        raise TypeError, "track block must return a Strudel::Pattern (got #{pat.class})"
+      end
+
+      track_registry[name] = TrackEntry.new(name, pat, muted)
+      pat
+    end
+
+    private :track_registry, :next_track_name, :register_track
+
+    # ---- Tempo (global) ----
+    #
+    # Strudel/Tidal expresses tempo in CPS (cycles per second).
+    # These functions change the global tempo that new Runner/Session instances pick up.
+    #
+    # See: https://tidalcycles.org/docs/reference/tempo/#setcps
+    def setcps(value)
+      Strudel.setcps(value)
+    end
+
+    def setcpm(value)
+      Strudel.setcpm(value)
+    end
+
+    # Convenience: set bpm by assuming "beats per cycle" (bpc).
+    # Common 4/4 interpretation is bpc=4.
+    def setbpm(bpm, bpc: 4)
+      Strudel.setbpm(bpm, bpc: bpc)
+    end
+
     # Create a pattern using sound("bd hh sd hh") notation
     def sound(pattern_string)
       pattern = Mini::Parser.new.parse(pattern_string)
@@ -100,13 +190,10 @@ module Strudel
     # Returns a different random value for each event
     def rand
       Pattern.new do |state|
-        state.span.span_cycles.map do |subspan|
-          whole = subspan.begin_time.whole_cycle
-          # Use cycle position as seed for reproducible randomness
-          seed = (whole.begin_time.value * 1000).to_i
-          random_value = Random.new(seed).rand
-          Hap.new(whole, subspan, random_value)
-        end
+        t = state.span.begin_time.to_f
+        value = time_to_rand(t)
+        # Keep whole present so the caller pattern's onsets are preserved through set_control
+        [Hap.new(state.span, state.span, value)]
       end
     end
 
@@ -128,14 +215,47 @@ module Strudel
       end
     end
 
-    module_function :register
+    module_function :register, :setcps, :setcpm, :setbpm
+
+    private
+
+    # Port of Strudel's timeToRand (packages/core/signal.mjs)
+    # - deterministic pseudo-random value for a given time in cycles
+    # - returns a Float in 0..1
+    def time_to_rand(x)
+      int_seed_to_rand(time_to_int_seed(x)).abs
+    end
+
+    # stretch 300 cycles over the range of [0, 2**29) then apply the xorshift algorithm
+    def time_to_int_seed(x)
+      t = x / 300.0
+      frac = t - t.truncate
+      seed = (frac * 536_870_912).truncate
+      xorwise(seed)
+    end
+
+    def int_seed_to_rand(x)
+      (x.remainder(536_870_912) / 536_870_912.0)
+    end
+
+    def xorwise(x)
+      a = int32((x << 13) ^ x)
+      b = int32((a >> 17) ^ a)
+      int32((b << 5) ^ b)
+    end
+
+    # Emulate JavaScript's 32-bit signed bitwise behavior.
+    def int32(n)
+      n &= 0xFFFF_FFFF
+      n >= 0x8000_0000 ? n - 0x1_0000_0000 : n
+    end
   end
 
   # Runner class: Makes it easy to play patterns using DSL
   class Runner
     include DSL
 
-    def initialize(samples_path: nil, cps: 0.5)
+    def initialize(samples_path: nil, cps: Strudel.cps)
       @samples_path = samples_path
       @cps = cps
       @scheduler = nil

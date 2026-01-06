@@ -40,13 +40,11 @@ module Strudel
       def process(input, output, frame_count, time_info, status_flags, user_data)
         samples = @generator.generate(frame_count)
 
-        # Mono to stereo conversion
-        stereo_samples = []
-        samples.each do |sample|
-          # Clipping prevention
-          clamped = sample.clamp(-1.0, 1.0)
-          stereo_samples << clamped # left
-          stereo_samples << clamped # right
+        left, right = samples
+        stereo_samples = Array.new(frame_count * 2, 0.0)
+        frame_count.times do |i|
+          stereo_samples[i * 2] = left[i].to_f.clamp(-1.0, 1.0)
+          stereo_samples[i * 2 + 1] = right[i].to_f.clamp(-1.0, 1.0)
         end
 
         output.write_array_of_float(stereo_samples)

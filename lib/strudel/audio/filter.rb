@@ -13,7 +13,9 @@ module Strudel
         @sample_rate = sample_rate
         @target_cutoff = cutoff.clamp(20.0, 20_000.0)
         @cutoff = @target_cutoff
-        @resonance = resonance.clamp(0.0, 1.0)
+        # Strudel's lpq is documented as "q resonance factor between 0 and 50".
+        # We treat this value as the biquad Q factor.
+        @resonance = resonance.clamp(0.0, 50.0)
         @y1 = 0.0  # Previous output (for feedback)
         @y2 = 0.0  # Two samples ago
         @x1 = 0.0  # Previous input
@@ -27,7 +29,7 @@ module Strudel
       end
 
       def resonance=(value)
-        new_resonance = value.clamp(0.0, 1.0)
+        new_resonance = value.clamp(0.0, 50.0)
         if new_resonance != @resonance
           @resonance = new_resonance
           @coefficients_dirty = true
@@ -86,8 +88,9 @@ module Strudel
         sin_omega = Math.sin(omega)
         cos_omega = Math.cos(omega)
 
-        # Q factor from resonance (0-1 mapped to 0.5-10, reduced max for stability)
-        q = 0.5 + @resonance * 9.5
+        # Biquad Q factor (lpq). Too small values heavily attenuate the signal.
+        # Keep a reasonable lower bound.
+        q = [@resonance, 0.5].max
         alpha = sin_omega / (2.0 * q)
 
         # Low-pass coefficients
@@ -109,7 +112,7 @@ module Strudel
 
     # ADSR Envelope for filter modulation
     class FilterEnvelope
-      attr_accessor :attack, :decay, :sustain, :release, :amount
+      attr_reader :attack, :decay, :sustain, :release, :env, :anchor
 
       def initialize(sample_rate: 44_100)
         @sample_rate = sample_rate
@@ -117,10 +120,36 @@ module Strudel
         @decay = 0.1     # Decay time in seconds
         @sustain = 0.5   # Sustain level (0-1)
         @release = 0.2   # Release time in seconds
-        @amount = 1.0    # Envelope amount (how much it affects the filter)
+
+        # Strudel-compatible filter envelope depth (octaves) and anchor (0..1)
+        @env = 0.0
+        @anchor = 0.0
+        @base_frequency = 1000.0
+        @min_cutoff = 1000.0
+        @max_cutoff = 1000.0
+        @sustain_cutoff = 1000.0
+
         @stage = :idle
         @level = 0.0
         @samples_in_stage = 0
+      end
+
+      # Configure envelope parameters and cutoff mapping.
+      #
+      # Strudel (superdough) interprets lpenv as an octave-based depth:
+      # min = 2**(-offset) * base
+      # max = 2**(envAbs - offset) * base
+      # where offset = envAbs * anchor
+      def configure(base_frequency:, env:, anchor:, attack:, decay:, sustain:, release:)
+        @base_frequency = base_frequency.to_f
+        @env = env.to_f
+        @anchor = anchor.to_f
+        @attack = attack.to_f
+        @decay = decay.to_f
+        @sustain = sustain.to_f
+        @release = release.to_f
+
+        recompute_cutoff_range
       end
 
       def trigger
@@ -129,12 +158,18 @@ module Strudel
       end
 
       def release_note
+        start_value = current_value
         @stage = :release
         @samples_in_stage = 0
-        @release_start_level = @level
+        @release_start_value = start_value
       end
 
-      def process(base_cutoff)
+      def process(base_frequency = nil)
+        if base_frequency
+          @base_frequency = base_frequency.to_f
+          recompute_cutoff_range
+        end
+
         case @stage
         when :attack
           attack_samples = (@attack * @sample_rate).to_i.clamp(1, 1_000_000)
@@ -157,7 +192,7 @@ module Strudel
         when :release
           release_samples = (@release * @sample_rate).to_i.clamp(1, 1_000_000)
           progress = @samples_in_stage.to_f / release_samples
-          @level = @release_start_level * (1.0 - progress)
+          @level = 0.0
           if @samples_in_stage >= release_samples
             @stage = :idle
             @level = 0.0
@@ -166,12 +201,9 @@ module Strudel
           @level = 0.0
         end
 
+        value = current_value
         @samples_in_stage += 1
-
-        # Calculate modulated cutoff
-        # amount controls how much the envelope opens the filter
-        modulated_cutoff = base_cutoff + (@amount * @level)
-        modulated_cutoff.clamp(20.0, 20_000.0)
+        value.clamp(0.0, 20_000.0)
       end
 
       def active?
@@ -182,6 +214,54 @@ module Strudel
         @stage = :idle
         @level = 0.0
         @samples_in_stage = 0
+      end
+
+      private
+
+      def recompute_cutoff_range
+        base = @base_frequency.to_f
+        env_abs = @env.abs
+        offset = env_abs * @anchor
+
+        min = (2.0**(-offset)) * base
+        max = (2.0**(env_abs - offset)) * base
+
+        min = min.clamp(0.0, 20_000.0)
+        max = max.clamp(0.0, 20_000.0)
+        min, max = [max, min] if @env.negative?
+
+        @min_cutoff = min
+        @max_cutoff = max
+        @sustain_cutoff = @min_cutoff + (@sustain * (@max_cutoff - @min_cutoff))
+      end
+
+      def exp_interp(from, to, t)
+        return from if t <= 0.0
+        return to if t >= 1.0
+        return from + (to - from) * t if from <= 0.0 || to <= 0.0
+
+        from * ((to / from)**t)
+      end
+
+      def current_value
+        case @stage
+        when :attack
+          exp_interp(@min_cutoff, @max_cutoff, @level)
+        when :decay
+          denom = (1.0 - @sustain)
+          progress = denom.zero? ? 1.0 : (1.0 - @level) / denom
+          exp_interp(@max_cutoff, @sustain_cutoff, progress)
+        when :sustain
+          @sustain_cutoff
+        when :release
+          # If release_note wasn't called, start from sustain_cutoff.
+          start = @release_start_value || @sustain_cutoff
+          release_samples = (@release * @sample_rate).to_i.clamp(1, 1_000_000)
+          progress = @samples_in_stage.to_f / release_samples
+          exp_interp(start, @min_cutoff, progress)
+        else
+          @min_cutoff
+        end
       end
     end
   end

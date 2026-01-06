@@ -339,8 +339,9 @@ module Strudel
 
     # Convert scale degrees to notes
     def scale(scale_spec)
-      root, scale_name = Theory::Scale.parse_scale_name(scale_spec)
-      base_note = 60 + root # C4 = 60 + root offset
+      root, scale_name, octave = Theory::Scale.parse_scale_name(scale_spec)
+      octave ||= 3 # Strudel/tonal default when tonic has no octave
+      base_note = (octave + 1) * 12 + root
 
       with_value do |degree|
         semitone = Theory::Scale.degree_to_semitone(degree, scale_name)
@@ -370,6 +371,33 @@ module Strudel
     # Set playback speed
     def speed(value)
       set_control(:speed, value)
+    end
+
+    # Delay amount (0-1). Currently accepted as a control but not rendered yet.
+    def delay(value = 0.5)
+      set_control(:delay, value)
+    end
+
+    def delaytime(value)
+      set_control(:delaytime, value)
+    end
+
+    alias_method :delayt, :delaytime
+    alias_method :dt, :delaytime
+
+    def delayfeedback(value)
+      set_control(:delayfeedback, value)
+    end
+
+    alias_method :delayfb, :delayfeedback
+    alias_method :dfb, :delayfeedback
+
+    def delaysync(value)
+      set_control(:delaysync, value)
+    end
+
+    def delayspeed(value)
+      set_control(:delayspeed, value)
     end
 
     # Set low-pass filter cutoff frequency (Hz)
@@ -415,6 +443,86 @@ module Strudel
     # Set detune amount (for supersaw, etc.)
     def detune(value)
       set_control(:detune, value)
+    end
+
+    # Set number of stacked voices (for supersaw, etc.)
+    def unison(value)
+      set_control(:unison, value)
+    end
+
+    # Set stereo spread (for supersaw, etc.)
+    # NOTE: Currently used as a hint only; strudel-rb renders mono internally.
+    def spread(value)
+      set_control(:spread, value)
+    end
+
+    # ---- Amp Envelope Controls (Strudel-like) ----
+
+    def attack(value)
+      set_control(:attack, value)
+    end
+
+    alias_method :att, :attack
+
+    def decay(value)
+      set_control(:decay, value)
+    end
+
+    alias_method :dec, :decay
+
+    def sustain(value)
+      set_control(:sustain, value)
+    end
+
+    alias_method :sus, :sustain
+
+    def release(value)
+      set_control(:release, value)
+    end
+
+    alias_method :rel, :release
+
+    # ---- FM / Ducking (accepted but not rendered yet) ----
+
+    # Frequency Modulation harmonicity ratio
+    def fmh(value)
+      set_control(:fmh, value)
+    end
+
+    # Frequency Modulation index (brightness). In Strudel this is `fmi` and `fm` is a synonym.
+    def fmi(value)
+      set_control(:fmi, value)
+    end
+
+    alias_method :fm, :fmi
+
+    def fmwave(value)
+      set_control(:fmwave, value)
+    end
+
+    def duckdepth(value)
+      set_control(:duckdepth, value)
+    end
+
+    def duckattack(value)
+      set_control(:duckattack, value)
+    end
+
+    def duckonset(value)
+      set_control(:duckonset, value)
+    end
+
+    alias_method :duckons, :duckonset
+
+    def duckorbit(value)
+      set_control(:duckorbit, value)
+    end
+
+    alias_method :duck, :duckorbit
+
+    # Visual helpers in Strudel (no-op in strudel-rb)
+    def _pianoroll(*_args)
+      self
     end
 
     # Set orbit (audio routing channel)

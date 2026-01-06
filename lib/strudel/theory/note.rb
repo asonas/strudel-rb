@@ -40,10 +40,6 @@ module Strudel
           semitone = midi_note % 12
           "#{NOTE_NAMES[semitone]}#{octave}"
         end
-
-        def to_frequency(midi_note)
-          440.0 * (2.0**((midi_note - 69) / 12.0))
-        end
       end
     end
   end
