@@ -3,9 +3,9 @@
 module Strudel
   module Live
     class Session
-      def initialize(samples_path: nil, cps: 0.5)
+      def initialize(samples_path: nil, cps: nil)
         @samples_path = samples_path
-        @cps = cps
+        @cps_override = cps
         @evaluator = PatternEvaluator.new
         @watcher = nil
         @runner = nil
@@ -32,6 +32,7 @@ module Strudel
         pattern = load_pattern(@path)
         if pattern
           setup_runner
+          apply_tempo if @runner
           @runner.play(pattern)
           @current_pattern = pattern
           puts "[#{timestamp}] Pattern loaded: #{@path}"
@@ -56,7 +57,17 @@ module Strudel
       def setup_runner
         return if @runner
 
-        @runner = Runner.new(samples_path: @samples_path, cps: @cps)
+        @runner = Runner.new(samples_path: @samples_path, cps: effective_cps)
+      end
+
+      def effective_cps
+        @cps_override || Strudel.cps
+      end
+
+      def apply_tempo
+        return if @cps_override
+
+        @runner.cps = Strudel.cps
       end
 
       def reload_pattern
@@ -64,6 +75,7 @@ module Strudel
         return unless pattern
 
         setup_runner unless @runner
+        apply_tempo if @runner
         @runner.play(pattern)
         @current_pattern = pattern
         puts "[#{timestamp}] Pattern reloaded"

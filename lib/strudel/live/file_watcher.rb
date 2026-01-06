@@ -1,6 +1,12 @@
 # frozen_string_literal: true
 
-require "listen"
+begin
+  require "listen"
+rescue LoadError
+  # Optional dependency for live file watching.
+  # If `listen` can't be loaded in the current environment, we'll raise a clearer
+  # error when `#start` is called.
+end
 
 module Strudel
   module Live
@@ -18,6 +24,11 @@ module Strudel
       end
 
       def start
+        unless defined?(Listen)
+          raise LoadError,
+                %(The "listen" gem is required to use Strudel::Live::FileWatcher. Please add `gem "listen"` and run `bundle install`.)
+        end
+
         @listener = Listen.to(@dir, only: /#{Regexp.escape(@filename)}$/) do |modified, added, _removed|
           if modified.include?(@path) || added.include?(@path)
             @callbacks.each { |cb| cb.call(@path) }

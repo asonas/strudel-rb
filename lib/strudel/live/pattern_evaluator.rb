@@ -6,7 +6,15 @@ module Strudel
       include DSL
 
       def evaluate_string(code)
-        instance_eval(code)
+        clear_tracks if respond_to?(:clear_tracks)
+        result = instance_eval(code)
+
+        # If tracks were defined, auto-stack them (Strudel-like $:)
+        if instance_variable_defined?(:@track_registry) && @track_registry && !@track_registry.empty?
+          return tracks
+        end
+
+        result
       end
 
       def evaluate_file(path)

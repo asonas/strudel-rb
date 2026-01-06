@@ -12,7 +12,9 @@ module Strudel
         "mixolydian" => [0, 2, 4, 5, 7, 9, 10],
         "locrian" => [0, 1, 3, 5, 6, 8, 10],
         "chromatic" => [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-        "pentatonic" => [0, 2, 4, 7, 9],
+        "pentatonic" => [0, 2, 4, 7, 9], # major pentatonic
+        "major_pentatonic" => [0, 2, 4, 7, 9],
+        "minor_pentatonic" => [0, 3, 5, 7, 10],
         "blues" => [0, 3, 5, 6, 7, 10],
         "wholetone" => [0, 2, 4, 6, 8, 10]
       }.freeze
@@ -29,7 +31,17 @@ module Strudel
 
       class << self
         def get(name)
-          SCALES[name.to_s.downcase] || SCALES["major"]
+          key = name.to_s.downcase
+          return SCALES[key] if SCALES.key?(key)
+
+          # Try fallback for compound scale names like "minor_pentatonic"
+          if key.include?("_")
+            key.split("_").reverse_each do |part|
+              return SCALES[part] if SCALES.key?(part)
+            end
+          end
+
+          SCALES["major"]
         end
 
         def degree_to_semitone(degree, scale_name = "major")
@@ -54,15 +66,42 @@ module Strudel
           return [0, "major"] if parts.empty?
 
           root_str = parts[0]
-          scale_name = parts[1] || "major"
+          scale_name = parts[1..].then { |xs| xs&.empty? ? nil : xs.join("_") } || "major"
 
+          octave = nil
           root = if root_str.match?(/^\d+$/)
                    root_str.to_i
                  else
-                   NOTE_MAP[root_str] || 0
+                   note, oct = parse_note_with_octave(root_str)
+                   octave = oct
+                   note
                  end
 
-          [root, scale_name]
+          [root, scale_name, octave]
+        end
+
+        def parse_note_with_octave(root_str)
+          # Accept forms like "g", "g3", "g#1", "bb2"
+          m = /\A([a-g])([#b]*)(-?\d+)?\z/i.match(root_str.to_s)
+          return [NOTE_MAP[root_str] || 0, nil] unless m
+
+          letter = m[1].downcase
+          accidentals = m[2].to_s
+          octave = m[3]&.to_i
+
+          base_pc = NOTE_MAP[letter] || 0
+          offset = accidentals.each_char.sum do |ch|
+            case ch
+            when "#"
+              1
+            when "b"
+              -1
+            else
+              0
+            end
+          end
+
+          [(base_pc + offset) % 12, octave]
         end
       end
     end

@@ -16,21 +16,6 @@ module Strudel
         @cache[key] ||= load_sample(name, n)
       end
 
-      # Check if sample exists
-      def exists?(name, n = 0)
-        path = sample_path(name, n)
-        File.exist?(path)
-      end
-
-      # List available sample names
-      def available_samples
-        return [] unless Dir.exist?(@samples_path)
-
-        Dir.children(@samples_path)
-           .select { |f| File.directory?(File.join(@samples_path, f)) }
-           .sort
-      end
-
       private
 
       def default_samples_path
@@ -55,17 +40,26 @@ module Strudel
           buffer = reader.read(reader.total_sample_frames)
           reader.close
 
-          # Convert to mono (use left channel only for stereo)
-          samples = if format.channels == 1
-                      buffer.samples
-                    else
-                      buffer.samples.map { |frame| frame[0] }
-                    end
+          # Keep (up to) stereo channels (Strudel-like)
+          channels =
+            if format.channels == 1
+              [buffer.samples]
+            else
+              # WaveFile returns frames like [L, R, ...]
+              channel_count = [format.channels, 2].min
+              chans = Array.new(channel_count) { [] }
+              buffer.samples.each do |frame|
+                channel_count.times do |i|
+                  chans[i] << frame[i]
+                end
+              end
+              chans
+            end
 
-          # Normalize to Float32
-          normalized = normalize_samples(samples, format.bits_per_sample)
+          # Normalize to Float32 per channel
+          normalized_channels = channels.map { |ch| normalize_samples(ch, format.bits_per_sample) }
 
-          SampleData.new(normalized, format.sample_rate)
+          SampleData.new(normalized_channels, format.sample_rate)
         rescue StandardError => e
           warn "Failed to load sample #{path}: #{e.message}"
           SampleData.silent
@@ -80,19 +74,25 @@ module Strudel
 
     # Class to hold sample data
     class SampleData
-      attr_reader :samples, :sample_rate
+      attr_reader :channels, :sample_rate
 
-      def initialize(samples, sample_rate)
-        @samples = samples
+      def initialize(channels, sample_rate)
+        @channels = channels
         @sample_rate = sample_rate
       end
 
+      def channel_count
+        @channels.length
+      end
+
       def length
-        @samples.length
+        return 0 if empty?
+
+        @channels.map(&:length).min
       end
 
       def empty?
-        @samples.empty?
+        @channels.empty? || @channels.all?(&:empty?)
       end
 
       def self.silent
