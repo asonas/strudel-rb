@@ -16,7 +16,7 @@ module Strudel
         "saw" => "sawtooth",
         "tri" => "triangle",
         "sqr" => "square",
-        "sin" => "sine"
+        "sin" => "sine",
       }.freeze
 
       def initialize(sample_rate: DEFAULT_SAMPLE_RATE, cps: DEFAULT_CPS, samples_path: nil)
@@ -214,7 +214,7 @@ module Strudel
         {
           wet: wet.to_f,
           time: time,
-          feedback: (delayfeedback || 0.5).to_f
+          feedback: (delayfeedback || 0.5).to_f,
         }
       end
 
@@ -232,7 +232,7 @@ module Strudel
           duckorbit: duckorbit || value[:duck],
           depth: (duckdepth || 1.0).to_f,
           onset: duckonset.to_f,
-          attack: (duckattack || 0.2).to_f
+          attack: (duckattack || 0.2).to_f,
         }
       end
 

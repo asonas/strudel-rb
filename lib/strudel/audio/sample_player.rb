@@ -126,7 +126,7 @@ module Strudel
           [attack.to_f, envmin].max,
           [decay.to_f, envmin].max,
           sustain_value.clamp(0.0, envmax),
-          [release.to_f, release_min].max
+          [release.to_f, release_min].max,
         ]
       end
     end

@@ -7,7 +7,8 @@ gem "wavefile"
 gem "parslet"
 gem "listen"
 
-group :test do
+group :development, :test do
   gem "minitest"
   gem "rake"
+  gem "rubocop", require: false
 end

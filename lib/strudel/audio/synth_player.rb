@@ -113,8 +113,8 @@ module Strudel
 
         # Setup gain envelope
         @amp_envelope.reset
-        a, d, s, r = resolve_adsr(attack, decay, sustain, release,
-                                 default_values: [DEFAULT_AMP_ATTACK, DEFAULT_AMP_DECAY, DEFAULT_AMP_SUSTAIN, DEFAULT_AMP_RELEASE])
+        defaults = [DEFAULT_AMP_ATTACK, DEFAULT_AMP_DECAY, DEFAULT_AMP_SUSTAIN, DEFAULT_AMP_RELEASE]
+        a, d, s, r = resolve_adsr(attack, decay, sustain, release, default_values: defaults)
         @amp_envelope.attack = a
         @amp_envelope.decay = d
         @amp_envelope.sustain = s
@@ -229,7 +229,7 @@ module Strudel
           [attack.to_f, envmin].max,
           [decay.to_f, envmin].max,
           sustain_value.clamp(0.0, envmax),
-          [release.to_f, release_min].max
+          [release.to_f, release_min].max,
         ]
       end
     end
