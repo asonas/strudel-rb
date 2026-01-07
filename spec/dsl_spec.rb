@@ -117,4 +117,22 @@ describe Strudel::DSL do
       assert_equal "sd", haps[1].value
     end
   end
+
+  describe "tempo helpers" do
+    it "updates Strudel.cps via setcps" do
+      Strudel.setcps(0.5)
+      setcps(1)
+      assert_in_delta 1.0, Strudel.cps, 0.0001
+    ensure
+      Strudel.setcps(Strudel::DEFAULT_CPS)
+    end
+
+    it "updates Strudel.cps via setcpm" do
+      Strudel.setcps(0.5)
+      setcpm(60)
+      assert_in_delta 1.0, Strudel.cps, 0.0001
+    ensure
+      Strudel.setcps(Strudel::DEFAULT_CPS)
+    end
+  end
 end

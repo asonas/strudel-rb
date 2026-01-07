@@ -346,7 +346,8 @@ describe Strudel::Pattern do
 
   describe "#scale" do
     it "converts scale degrees to notes" do
-      # Degree 0, 1, 2 in C major = C, D, E (MIDI 60, 62, 64)
+      # Strudel/tonal default octave is 3 when not explicitly specified.
+      # Degree 0, 1, 2 in C major = C3, D3, E3 (MIDI 48, 50, 52)
       pattern = Strudel::Pattern.fastcat(
         Strudel::Pattern.pure(0),
         Strudel::Pattern.pure(1),
@@ -355,26 +356,32 @@ describe Strudel::Pattern do
       haps = pattern.query_arc(0, 1)
 
       assert_equal 3, haps.length
-      assert_equal 60, haps[0].value[:note]
-      assert_equal 62, haps[1].value[:note]
-      assert_equal 64, haps[2].value[:note]
+      assert_equal 48, haps[0].value[:note]
+      assert_equal 50, haps[1].value[:note]
+      assert_equal 52, haps[2].value[:note]
     end
 
     it "handles different root notes" do
-      # Degree 0 in A minor (A = 9 semitones from C)
-      # A4 = MIDI 69
+      # Degree 0 in A minor defaults to A3 = MIDI 57
       pattern = Strudel::Pattern.pure(0).scale("a:minor")
       haps = pattern.query_arc(0, 1)
 
-      assert_equal 69, haps.first.value[:note]
+      assert_equal 57, haps.first.value[:note]
     end
 
     it "handles numeric root" do
-      # Root 9 = A
+      # Root 9 = A, default octave 3 => MIDI 57
       pattern = Strudel::Pattern.pure(0).scale("9:minor")
       haps = pattern.query_arc(0, 1)
 
-      assert_equal 69, haps.first.value[:note]
+      assert_equal 57, haps.first.value[:note]
+    end
+
+    it "supports explicit octave in root note" do
+      pattern = Strudel::Pattern.pure(0).scale("c4:major")
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 60, haps.first.value[:note]
     end
   end
 

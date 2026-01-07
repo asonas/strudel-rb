@@ -45,5 +45,13 @@ describe Strudel::Audio::Oscillator do
       assert_equal 100, samples.length
       assert samples.all? { |s| s >= -1.0 && s <= 1.0 }
     end
+
+    it "generates supersaw samples" do
+      osc = Strudel::Audio::Oscillator.new(:supersaw, sample_rate: 44100, voices: 7)
+      samples = osc.generate(frequency: 440, frame_count: 100)
+
+      assert_equal 100, samples.length
+      assert samples.all?(&:finite?)
+    end
   end
 end
