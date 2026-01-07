@@ -26,4 +26,3 @@ describe Strudel::Audio::LowPassFilter do
     end
   end
 end
-

@@ -20,4 +20,3 @@ describe Strudel::Audio::DelayLine do
     assert_equal out_l, out_r
   end
 end
-

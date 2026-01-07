@@ -26,7 +26,8 @@ module Strudel
       def start
         unless defined?(Listen)
           raise LoadError,
-                %(The "listen" gem is required to use Strudel::Live::FileWatcher. Please add `gem "listen"` and run `bundle install`.)
+                'The "listen" gem is required to use Strudel::Live::FileWatcher. ' \
+                'Please add `gem "listen"` and run `bundle install`.'
         end
 
         @listener = Listen.to(@dir, only: /#{Regexp.escape(@filename)}$/) do |modified, added, _removed|

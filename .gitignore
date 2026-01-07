@@ -1,2 +1,6 @@
 workbench/
 vendor/
+
+# RuboCop remote config cache
+.rubocop-remote-*
+.rubocop-https---*

@@ -12,11 +12,10 @@ module Strudel
         "mixolydian" => [0, 2, 4, 5, 7, 9, 10],
         "locrian" => [0, 1, 3, 5, 6, 8, 10],
         "chromatic" => [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-        "pentatonic" => [0, 2, 4, 7, 9], # major pentatonic
-        "major_pentatonic" => [0, 2, 4, 7, 9],
+        "pentatonic" => [0, 2, 4, 7, 9],
         "minor_pentatonic" => [0, 3, 5, 7, 10],
         "blues" => [0, 3, 5, 6, 7, 10],
-        "wholetone" => [0, 2, 4, 6, 8, 10]
+        "wholetone" => [0, 2, 4, 6, 8, 10],
       }.freeze
 
       NOTE_MAP = {
@@ -26,7 +25,7 @@ module Strudel
         "f" => 5, "f#" => 6, "gb" => 6,
         "g" => 7, "g#" => 8, "ab" => 8,
         "a" => 9, "a#" => 10, "bb" => 10,
-        "b" => 11
+        "b" => 11,
       }.freeze
 
       class << self

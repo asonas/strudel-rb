@@ -16,4 +16,3 @@ describe Strudel::Audio::DuckEnvelope do
     assert_in_delta 1.0, gains[5], 0.0001
   end
 end
-

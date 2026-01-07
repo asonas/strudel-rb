@@ -50,4 +50,3 @@ module Strudel
     end
   end
 end
-

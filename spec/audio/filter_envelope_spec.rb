@@ -47,4 +47,3 @@ describe Strudel::Audio::FilterEnvelope do
     end
   end
 end
-
