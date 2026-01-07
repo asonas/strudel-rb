@@ -67,6 +67,19 @@ describe Strudel::Mini::Parser do
     end
   end
 
+  describe "elongate (_)" do
+    it "extends the duration of the previous event by one step" do
+      pattern = parse("bd _ _ ~ sd _")
+      haps = pattern.query_arc(0, 1)
+
+      bd = haps.find { |h| h.value == "bd" }
+      assert_equal Strudel::TimeSpan.new(0, Rational(1, 2)), bd.whole
+
+      sd = haps.find { |h| h.value == "sd" }
+      assert_equal Strudel::TimeSpan.new(Rational(4, 6), 1), sd.whole
+    end
+  end
+
   describe "subsequence" do
     it "parses bracketed subsequence" do
       pattern = parse("bd [hh hh]")
@@ -127,6 +140,19 @@ describe Strudel::Mini::Parser do
     end
   end
 
+  describe "replicate (!)" do
+    it "replicates a step and increases the number of steps" do
+      pattern = parse("bd!3 sd")
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 4, haps.length
+      assert_equal %w[bd bd bd sd], haps.map(&:value)
+
+      assert_equal Strudel::TimeSpan.new(0, Rational(1, 4)), haps[0].whole
+      assert_equal Strudel::TimeSpan.new(Rational(3, 4), 1), haps[3].whole
+    end
+  end
+
   describe "stack (parallel)" do
     it "parses comma-separated stack" do
       pattern = parse("bd, hh")
@@ -161,6 +187,38 @@ describe Strudel::Mini::Parser do
       haps2 = pattern.query_arc(2, 3)
       assert_equal 1, haps2.length
       assert_equal "hh", haps2.first.value
+    end
+
+    it "treats _ as hold (repeat previous cycle) inside slowcat" do
+      pattern = parse("<7 _ _ 6>")
+      haps = pattern.query_arc(0, 4)
+
+      assert_equal 4, haps.length
+      assert_equal %w[7 7 7 6], haps.map(&:value)
+
+      assert_equal Strudel::TimeSpan.new(0, 1), haps[0].whole
+      assert_equal Strudel::TimeSpan.new(1, 2), haps[1].whole
+      assert_equal Strudel::TimeSpan.new(2, 3), haps[2].whole
+      assert_equal Strudel::TimeSpan.new(3, 4), haps[3].whole
+    end
+
+    it "supports fast (*n) by pulling values from subsequent cycles" do
+      pattern = parse("<bd sd hh>*4")
+      haps0 = pattern.query_arc(0, 1)
+
+      assert_equal 4, haps0.length
+      assert_equal %w[bd sd hh bd], haps0.map(&:value)
+    end
+
+    it "keeps step count at n for <...>*n (not elements*n)" do
+      pattern = parse("<0 4 0 9 7>*16")
+      haps0 = pattern.query_arc(0, 1)
+
+      assert_equal 16, haps0.length
+      assert_equal(
+        %w[0 4 0 9 7 0 4 0 9 7 0 4 0 9 7 0],
+        haps0.map(&:value)
+      )
     end
   end
 end

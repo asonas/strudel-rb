@@ -31,28 +31,45 @@ describe Strudel::Audio::SynthPlayer do
     it "generates audio samples" do
       player = Strudel::Audio::SynthPlayer.new(:sine)
       player.trigger(frequency: 440)
-      samples = player.generate(100)
+      left, right = player.generate(100)
 
-      assert_equal 100, samples.length
-      assert samples.any? { |s| s != 0.0 }
+      assert_equal 100, left.length
+      assert_equal 100, right.length
+      assert left.any? { |s| s != 0.0 }
     end
 
-    it "applies decay envelope" do
-      player = Strudel::Audio::SynthPlayer.new(:sine, decay: 0.1)
-      player.trigger(frequency: 440)
+    it "stops after the given duration with a short release tail" do
+      player = Strudel::Audio::SynthPlayer.new(:sine, sample_rate: 1000)
+      player.trigger(frequency: 440, duration: 0.01) # 10ms hold
 
-      # Generate enough samples for decay to happen (0.1s = 4410 samples at 44100Hz)
-      samples1 = player.generate(1000)
-      samples2 = player.generate(1000)
-      samples3 = player.generate(1000)
-      samples4 = player.generate(1000)
-      samples5 = player.generate(1000)
+      player.generate(5)
+      assert player.playing?
 
-      # After decay, amplitude should be lower
-      avg1 = samples1.map(&:abs).sum / samples1.length
-      avg5 = samples5.map(&:abs).sum / samples5.length
+      player.generate(30) # hold + release should be done
+      refute player.playing?
+    end
 
-      assert avg5 < avg1, "Decay should reduce amplitude over time"
+    it "applies attack envelope" do
+      player = Strudel::Audio::SynthPlayer.new(:sine, sample_rate: 1000)
+      player.trigger(frequency: 100, duration: 0.2, attack: 0.05, decay: 0.05, sustain: 1.0, release: 0.01)
+
+      early = player.generate(10).first.map(&:abs).sum / 10.0
+      mid = player.generate(60).first.map(&:abs).sum / 60.0
+
+      assert mid > early, "Attack should increase amplitude over time"
+    end
+
+    it "supports FM modulation" do
+      base = Strudel::Audio::SynthPlayer.new(:sine, sample_rate: 1000)
+      base.trigger(frequency: 100, duration: 0.2)
+      base_samples = base.generate(50).first
+
+      fm = Strudel::Audio::SynthPlayer.new(:sine, sample_rate: 1000)
+      fm.trigger(frequency: 100, duration: 0.2, fmi: 0.8, fmh: 1.0, fmwave: "sine")
+      fm_samples = fm.generate(50).first
+
+      refute_equal base_samples, fm_samples
+      assert fm_samples.all?(&:finite?)
     end
   end
 
