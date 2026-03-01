@@ -533,11 +533,383 @@ module Strudel
     # Alias for orbit
     alias_method :o, :orbit
 
+    # ---- Reverb Controls ----
+
+    # Set reverb wet/dry mix (0.0 - 1.0)
+    def room(value)
+      set_control(:room, value)
+    end
+
+    # Set reverb room size (0 - 10)
+    def roomsize(value)
+      set_control(:roomsize, value)
+    end
+
+    alias_method :rsize, :roomsize
+    alias_method :sz, :roomsize
+    alias_method :size, :roomsize
+
+    # ---- Tonal Controls ----
+
+    # Transpose by octaves (additive). oct(2) = trans(24).
+    def oct(value)
+      trans(value.is_a?(Pattern) ? value.mul(12) : value * 12)
+    end
+
+    # Alias for trans (semitone transposition)
+    alias_method :transpose, :trans
+
+    # ---- Clip Control ----
+
+    # Set clip (event duration factor, 0.0 - 1.0)
+    def clip(value)
+      set_control(:clip, value)
+    end
+
+    # ---- Distortion Controls ----
+
+    # Set distortion amount
+    def distort(value)
+      set_control(:distort, value)
+    end
+
+    alias_method :dist, :distort
+
+    # Set distortion type
+    def distorttype(value)
+      set_control(:distorttype, value)
+    end
+
+    # Sinefold distortion shortcut
+    def sinefold(value)
+      distort(value).distorttype("sinefold")
+    end
+
+    # Fold distortion shortcut
+    def fold(value)
+      distort(value).distorttype("fold")
+    end
+
+    # Diode distortion shortcut
+    def diode(value)
+      distort(value).distorttype("diode")
+    end
+
+    # Set post-distortion volume
+    def distortvol(value)
+      set_control(:distortvol, value)
+    end
+
+    # ---- Pattern Operation Methods ----
+
+    # Segment: sample a continuous pattern into n discrete events per cycle.
+    def segment(n)
+      Pattern.new do |state|
+        state.span.span_cycles.flat_map do |subspan|
+          cycle = subspan.begin_time.sam
+          step = Rational(1, n)
+
+          n.times.filter_map do |i|
+            seg_begin = cycle + Fraction.new(step * i)
+            seg_end = cycle + Fraction.new(step * (i + 1))
+            whole = TimeSpan.new(seg_begin, seg_end)
+
+            part = whole.intersection(subspan)
+            next unless part
+
+            # Sample the pattern at the segment start
+            sample_span = TimeSpan.new(seg_begin, seg_end)
+            sample_state = state.set_span(sample_span)
+            haps = query(sample_state)
+            next if haps.empty?
+
+            Hap.new(whole, part, haps.first.value)
+          end
+        end
+      end
+    end
+
+    alias_method :seg, :segment
+
+    # Ribbon: loop a section of the pattern from [offset, offset+cycles).
+    def ribbon(offset, cycles)
+      Pattern.new do |state|
+        state.span.span_cycles.flat_map do |subspan|
+          cycle_num = subspan.begin_time.sam.to_i
+          mapped_cycle = offset + (cycle_num % cycles)
+          shift = Fraction.new(mapped_cycle - cycle_num)
+
+          shifted_span = TimeSpan.new(
+            subspan.begin_time + shift,
+            subspan.end_time + shift
+          )
+
+          query(state.set_span(shifted_span)).map do |hap|
+            new_whole = hap.whole && TimeSpan.new(
+              hap.whole.begin_time - shift,
+              hap.whole.end_time - shift
+            )
+            new_part = TimeSpan.new(
+              hap.part.begin_time - shift,
+              hap.part.end_time - shift
+            )
+            Hap.new(new_whole, new_part, hap.value, hap.context)
+          end
+        end
+      end
+    end
+
+    alias_method :rib, :ribbon
+
+    # InnerJoin: flatten a Pattern<Pattern<T>> to Pattern<T>.
+    # For each outer Hap whose value is a Pattern, query that inner pattern
+    # within the outer Hap's time range and return intersecting Haps.
+    # Non-Pattern values pass through unchanged.
+    def inner_join
+      Pattern.new do |state|
+        query(state).flat_map do |outer_hap|
+          unless outer_hap.value.is_a?(Pattern)
+            next [outer_hap]
+          end
+
+          query_span = outer_hap.whole || outer_hap.part
+          outer_hap.value.query(state.set_span(query_span)).filter_map do |inner_hap|
+            intersection = outer_hap.part.intersection(inner_hap.part)
+            next unless intersection
+
+            new_whole = if outer_hap.whole && inner_hap.whole
+                          outer_hap.whole.intersection(inner_hap.whole)
+                        end
+
+            Hap.new(new_whole, intersection, inner_hap.value)
+          end
+        end
+      end
+    end
+
+    # Ply: repeat each event n times, subdividing its time span.
+    def ply(n)
+      n = n.to_i
+
+      Pattern.new do |state|
+        query(state).flat_map do |hap|
+          whole = hap.whole || hap.part
+          dur = whole.duration
+          sub_dur = dur / n
+
+          n.times.filter_map do |i|
+            sub_begin = whole.begin_time + Fraction.new(sub_dur * i)
+            sub_end = whole.begin_time + Fraction.new(sub_dur * (i + 1))
+            sub_whole = TimeSpan.new(sub_begin, sub_end)
+
+            sub_part = sub_whole.intersection(state.span)
+            next unless sub_part
+
+            Hap.new(sub_whole, sub_part, hap.value, hap.context)
+          end
+        end
+      end
+    end
+
+    # Round: round numeric values to nearest integer.
+    def round
+      with_value { |v| v.round }
+    end
+
+    # Range: scale 0.0-1.0 values to min..max range.
+    def range(min, max)
+      with_value { |v| min + v * (max - min) }
+    end
+
+    # Fill: extend each event to fill the gap until the next event.
+    def fill
+      Pattern.new do |state|
+        cycle = state.span.begin_time.sam
+        wide_span = TimeSpan.new(cycle, cycle + Fraction.new(1))
+        all_haps = query(state.set_span(wide_span))
+          .select { |h| h.whole }
+          .sort_by { |h| h.whole.begin_time.value }
+
+        all_haps.each_with_index.filter_map do |hap, i|
+          next_onset = if i + 1 < all_haps.length
+                         all_haps[i + 1].whole.begin_time
+                       else
+                         cycle + Fraction.new(1)
+                       end
+
+          new_whole = TimeSpan.new(hap.whole.begin_time, next_onset)
+          new_part = new_whole.intersection(state.span)
+          next unless new_part
+
+          Hap.new(new_whole, new_part, hap.value, hap.context)
+        end
+      end
+    end
+
+    # Beat: place events at specified beat positions within a division.
+    def beat(positions_str, division)
+      positions = positions_str.split(",").map { |p| p.strip.to_i }
+
+      bool_array = Array.new(division, false)
+      positions.each { |p| bool_array[p] = true if p < division }
+
+      bool_pattern = self.class.fastcat(*bool_array)
+      struct(bool_pattern)
+    end
+
+    # Scrub: set sample playback position control.
+    def scrub(value)
+      set_control(:scrub, value)
+    end
+
+    # Restart: restart this pattern at each onset of the trigger pattern.
+    def restart(trigger_pattern)
+      trigger_pattern = self.class.reify(trigger_pattern)
+
+      Pattern.new do |state|
+        state.span.span_cycles.flat_map do |subspan|
+          trigger_haps = trigger_pattern.query(state.set_span(subspan))
+            .select(&:has_onset?)
+
+          if trigger_haps.empty?
+            query(state.set_span(subspan))
+          else
+            cycle = subspan.begin_time.sam
+            frac_begin = subspan.begin_time - cycle
+            frac_end = subspan.end_time - cycle
+            restarted_span = TimeSpan.new(frac_begin, frac_end)
+
+            query(state.set_span(restarted_span)).map do |hap|
+              new_whole = hap.whole && TimeSpan.new(
+                hap.whole.begin_time + cycle,
+                hap.whole.end_time + cycle
+              )
+              new_part = TimeSpan.new(
+                hap.part.begin_time + cycle,
+                hap.part.end_time + cycle
+              )
+              Hap.new(new_whole, new_part, hap.value, hap.context)
+            end
+          end
+        end
+      end
+    end
+
+    # Mask: keep events where bool_pattern is truthy, remove where 0/falsy.
+    # Unlike struct, mask preserves the original pattern's timing (whole).
+    def mask(bool_pattern)
+      bool_pattern = self.class.reify(bool_pattern)
+
+      Pattern.new do |state|
+        query(state).select do |hap|
+          query_span = hap.whole || hap.part
+          bool_haps = bool_pattern.query(state.set_span(query_span))
+          bool_haps.any? { |bh| bh.part.intersection(hap.part) && bh.value != 0 && bh.value }
+        end
+      end
+    end
+
+    # Apply euclidean rhythm structure to this pattern.
+    def euclid(pulses, steps, rotation = 0)
+      struct(self.class.euclid(pulses, steps, rotation))
+    end
+
+    # Apply a boolean pattern as rhythmic structure.
+    # Only events where the bool pattern is true are kept.
+    def struct(bool_pattern)
+      bool_pattern = self.class.reify(bool_pattern)
+
+      Pattern.new do |state|
+        bool_pattern.query(state).flat_map do |bool_hap|
+          next [] unless bool_hap.value
+
+          query_span = bool_hap.whole || bool_hap.part
+          query(state.set_span(query_span)).filter_map do |hap|
+            intersection = hap.part.intersection(bool_hap.part)
+            next unless intersection
+
+            Hap.new(bool_hap.whole, intersection, hap.value)
+          end
+        end
+      end
+    end
+
+    # ---- Probability Methods ----
+
+    # Apply function with given probability per event.
+    def sometimes_by(prob, &func)
+      Pattern.new do |state|
+        original_haps = query(state)
+        transformed_haps = func.call(self).query(state)
+
+        original_haps.zip(transformed_haps).map do |orig, trans|
+          t = (orig.whole || orig.part).begin_time.to_f
+          rand_val = self.class.send(:time_to_rand, t + 0.123)
+          rand_val < prob ? (trans || orig) : orig
+        end
+      end
+    end
+
+    def sometimes(&func)
+      sometimes_by(0.5, &func)
+    end
+
+    def often(&func)
+      sometimes_by(0.75, &func)
+    end
+
+    def rarely(&func)
+      sometimes_by(0.25, &func)
+    end
+
+    def almost_never(&func)
+      sometimes_by(0.1, &func)
+    end
+
+    alias_method :almostNever, :almost_never
+
+    def almost_always(&func)
+      sometimes_by(0.9, &func)
+    end
+
+    alias_method :almostAlways, :almost_always
+
+    # Remove events with given probability.
+    def degrade_by(amount)
+      Pattern.new do |state|
+        query(state).select do |hap|
+          t = (hap.whole || hap.part).begin_time.to_f
+          rand_val = self.class.send(:time_to_rand, t + 0.456)
+          rand_val >= amount
+        end
+      end
+    end
+
+    def degrade
+      degrade_by(0.5)
+    end
+
     def inspect
       "Pattern"
     end
 
     private
+
+    # Deterministic pseudo-random value for a given time (0..1)
+    def self.time_to_rand(x)
+      t = x / 300.0
+      frac = t - t.truncate
+      seed = (frac * 536_870_912).truncate
+      a = int32((seed << 13) ^ seed)
+      b = int32((a >> 17) ^ a)
+      c = int32((b << 5) ^ b)
+      (c.remainder(536_870_912) / 536_870_912.0).abs
+    end
+
+    def self.int32(n)
+      n &= 0xFFFF_FFFF
+      n >= 0x8000_0000 ? n - 0x1_0000_0000 : n
+    end
 
     # Set control value (pattern-aware with inner join)
     def set_control(key, value)
