@@ -4,7 +4,7 @@ module Strudel
   module Scheduler
     class Cyclist
       ActiveVoice = Data.define(:player, :orbit, :pan)
-      OrbitState = Data.define(:delay, :duck)
+      OrbitState = Data.define(:delay, :duck, :reverb)
 
       attr_accessor :cps, :pattern
       attr_reader :sample_rate
@@ -30,7 +30,8 @@ module Strudel
         @orbits = Hash.new do |h, k|
           h[k] = OrbitState.new(
             Audio::DelayLine.new(sample_rate: @sample_rate),
-            Audio::DuckEnvelope.new(sample_rate: @sample_rate)
+            Audio::DuckEnvelope.new(sample_rate: @sample_rate),
+            Audio::Reverb.new(sample_rate: @sample_rate)
           )
         end
       end
@@ -102,6 +103,7 @@ module Strudel
         pan = extract_pan(value)
         delay_params = extract_delay_params(value, duration_seconds)
         duck_event = extract_duck_event(value)
+        reverb_params = extract_reverb_params(value)
 
         # For synth sounds
         if SYNTH_WAVEFORMS.include?(sound_name)
@@ -109,6 +111,8 @@ module Strudel
           unison = extract_unison(value)
           spread = extract_spread(value)
           lpf_params = extract_lpf_params(value)
+          hpf_params = extract_hpf_params(value)
+          distort_params = extract_distort_params(value)
           amp_params = extract_amp_params(value)
           fm_params = extract_fm_params(value)
 
@@ -127,9 +131,12 @@ module Strudel
             detune: detune,
             **amp_params,
             **fm_params,
-            **lpf_params
+            **lpf_params,
+            **hpf_params,
+            **distort_params
           )
           apply_orbit_delay(orbit, delay_params) if delay_params
+          apply_orbit_reverb(orbit, reverb_params) if reverb_params
           trigger_duck(duck_event) if duck_event
           @active_players << ActiveVoice.new(player, orbit, pan)
           return
@@ -141,9 +148,11 @@ module Strudel
 
         speed = extract_speed(value)
         amp_params = extract_amp_params(value)
+        hpf_params = extract_hpf_params(value)
         player = Audio::SamplePlayer.new(sample_data, @sample_rate)
-        player.trigger(gain: gain, speed: speed, duration: duration_seconds, **amp_params)
+        player.trigger(gain: gain, speed: speed, duration: duration_seconds, **amp_params, **hpf_params)
         apply_orbit_delay(orbit, delay_params) if delay_params
+        apply_orbit_reverb(orbit, reverb_params) if reverb_params
         trigger_duck(duck_event) if duck_event
         @active_players << ActiveVoice.new(player, orbit, pan)
       end
@@ -281,6 +290,42 @@ module Strudel
         value[:spread]
       end
 
+      def extract_reverb_params(value)
+        return nil unless value.is_a?(Hash)
+
+        room = value[:room]
+        roomsize = value[:roomsize] || value[:rsize] || value[:sz] || value[:size]
+
+        return nil if room.nil? && roomsize.nil?
+
+        {
+          wet: (room || 0.0).to_f,
+          roomsize: (roomsize || 1.0).to_f,
+        }
+      end
+
+      def apply_orbit_reverb(orbit, params)
+        @orbits[orbit].reverb.configure(**params)
+      end
+
+      def extract_distort_params(value)
+        return {} unless value.is_a?(Hash)
+
+        params = {}
+        params[:distort] = value[:distort] if value[:distort]
+        params[:distorttype] = value[:distorttype] if value[:distorttype]
+        params[:distortvol] = value[:distortvol] if value[:distortvol]
+        params
+      end
+
+      def extract_hpf_params(value)
+        return {} unless value.is_a?(Hash)
+
+        params = {}
+        params[:hpf] = value[:hpf] if value[:hpf]
+        params
+      end
+
       def extract_lpf_params(value)
         return {} unless value.is_a?(Hash)
 
@@ -353,6 +398,8 @@ module Strudel
         orbit_buffers.each do |orbit, (buf_l, buf_r)|
           # Orbit-level delay (Strudel-like)
           processed_l, processed_r = @orbits[orbit].delay.process(buf_l, buf_r)
+          # Orbit-level reverb
+          processed_l, processed_r = @orbits[orbit].reverb.process(processed_l, processed_r)
           # Orbit-level ducking (Strudel-like)
           gains = @orbits[orbit].duck.process(frame_count)
           frame_count.times do |i|

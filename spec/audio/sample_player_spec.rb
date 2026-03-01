@@ -64,6 +64,30 @@ describe Strudel::Audio::SamplePlayer do
     end
   end
 
+  describe "HPF support" do
+    it "accepts hpf parameter and attenuates low frequencies" do
+      # Generate a low-frequency sine wave as sample data
+      sr = 44_100
+      samples = Array.new(4410) { |i| Math.sin(2.0 * Math::PI * 100.0 * i / sr) }
+      data = DummySampleData.new([samples], sr)
+
+      # Without HPF
+      player_no_hpf = Strudel::Audio::SamplePlayer.new(data, sr)
+      player_no_hpf.trigger(gain: 1.0)
+      out_no_hpf = player_no_hpf.generate(4410).first
+
+      # With HPF at 5000 Hz
+      player_hpf = Strudel::Audio::SamplePlayer.new(data, sr)
+      player_hpf.trigger(gain: 1.0, hpf: 5000.0)
+      out_hpf = player_hpf.generate(4410).first
+
+      rms_no_hpf = Math.sqrt(out_no_hpf.sum { |s| s * s } / out_no_hpf.length)
+      rms_hpf = Math.sqrt(out_hpf.sum { |s| s * s } / out_hpf.length)
+
+      assert rms_hpf < rms_no_hpf, "HPF should reduce energy of a low-frequency signal"
+    end
+  end
+
   describe "#generate" do
     it "produces audio samples" do
       data = DummySampleData.new([[0.5] * 100])
