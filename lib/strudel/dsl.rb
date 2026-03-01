@@ -202,6 +202,47 @@ module Strudel
       rand.fmap { |v| (v * n).to_i }
     end
 
+    # ---- Signal Patterns ----
+
+    # Triangle wave: 0 -> 1 -> 0 over one cycle
+    def tri
+      Pattern.new do |state|
+        t = state.span.begin_time.to_f
+        cycle_pos = t - t.floor
+        value = 1.0 - (2.0 * (cycle_pos - 0.5)).abs
+        [Hap.new(state.span, state.span, value)]
+      end
+    end
+
+    # Sawtooth wave: 0 -> 1 linearly over one cycle
+    def saw
+      Pattern.new do |state|
+        t = state.span.begin_time.to_f
+        value = t - t.floor
+        [Hap.new(state.span, state.span, value)]
+      end
+    end
+
+    # Sine wave: oscillates between 0 and 1
+    def sine
+      Pattern.new do |state|
+        t = state.span.begin_time.to_f
+        cycle_pos = t - t.floor
+        value = (1.0 + Math.sin(2.0 * Math::PI * cycle_pos)) / 2.0
+        [Hap.new(state.span, state.span, value)]
+      end
+    end
+
+    # Square wave: 1 for first half, 0 for second half
+    def square
+      Pattern.new do |state|
+        t = state.span.begin_time.to_f
+        cycle_pos = t - t.floor
+        value = cycle_pos < 0.5 ? 1.0 : 0.0
+        [Hap.new(state.span, state.span, value)]
+      end
+    end
+
     # Register a custom function on Pattern
     # Usage:
     #   register(:acidenv) do |x, pat|
@@ -215,7 +256,124 @@ module Strudel
       end
     end
 
+    # ---- Arrange Functions ----
+
+    # Stepcat: concatenate patterns proportionally by step count.
+    # Each section is [steps, pattern].
+    def stepcat(*sections)
+      total = sections.sum { |steps, _| steps.to_r }
+
+      Pattern.new do |state|
+        state.span.span_cycles.flat_map do |subspan|
+          cycle = subspan.begin_time.sam
+          pos = Rational(0)
+
+          sections.flat_map do |steps, pattern|
+            pattern = Pattern.reify(pattern)
+            frac = steps.to_r / total
+
+            sect_begin = cycle + Fraction.new(pos)
+            sect_end = cycle + Fraction.new(pos + frac)
+            sect_span = TimeSpan.new(sect_begin, sect_end)
+
+            intersection = sect_span.intersection(subspan)
+            pos += frac
+            next [] unless intersection
+
+            scale_factor = Rational(1) / frac
+
+            inner_begin = cycle + Fraction.new((intersection.begin_time.value - sect_begin.value) * scale_factor)
+            inner_end = cycle + Fraction.new((intersection.end_time.value - sect_begin.value) * scale_factor)
+            inner_span = TimeSpan.new(inner_begin, inner_end)
+
+            pattern.query(state.set_span(inner_span)).map do |hap|
+              remap = ->(t) {
+                inner_pos = t.value - cycle.value
+                Fraction.new(sect_begin.value + inner_pos * frac)
+              }
+
+              new_whole = hap.whole && TimeSpan.new(remap.call(hap.whole.begin_time), remap.call(hap.whole.end_time))
+              new_part = TimeSpan.new(remap.call(hap.part.begin_time), remap.call(hap.part.end_time))
+
+              Hap.new(new_whole, new_part, hap.value, hap.context)
+            end
+          end
+        end
+      end
+    end
+
+    # Ar (Quick Arrange): play sections sequentially for given cycle counts.
+    # Usage: ar(16, intro, 16, break1, 32, drop)
+    def ar(*input)
+      sects = []
+      total = 0
+
+      input.each_slice(2) do |cycles, pattern|
+        total += cycles
+        sects << [cycles, pattern.ribbon(0, cycles).fast(cycles)]
+      end
+
+      stepcat(*sects).slow(total)
+    end
+
+    # BlockArrange: control track ON/OFF/reverse per cycle with mask patterns.
+    # pat_arr: [[pattern, mask_pattern], ...]
+    # mask values: "F" = forward, "0" = silence, "B" = backwards, "R" = restart
+    def block_arrange(pat_arr, modifiers = [])
+      tracks = pat_arr.map do |pat, mask_pat|
+        pats = pat.is_a?(Array) ? pat : [pat]
+        mask_pat = Pattern.reify(mask_pat)
+
+        mask_pat.fmap do |m|
+          next Pattern.silence if m.to_s == "0"
+
+          ms = m.to_s
+          inner = Pattern.stack(*pats.map do |p|
+            new_pat = p
+            new_pat = new_pat.restart(1) if ms.include?("R")
+            new_pat = new_pat.rev.speed(-1) if ms.include?("B")
+            modifiers.each do |mod_check, callback|
+              new_pat = callback.call(new_pat) if mod_check.call(ms)
+            end
+            new_pat
+          end)
+
+          inner
+        end.inner_join
+      end
+
+      Pattern.stack(*tracks.flatten)
+    end
+
     module_function :register, :setcps, :setcpm, :setbpm
+
+    # ---- Built-in register functions (Phase 5) ----
+
+    # Normalized low-pass filter: x in 0-1, maps to cutoff = (x*12)^4
+    register(:rlpf) do |x, pat|
+      pat.lpf(Pattern.pure(x).mul(12).pow(4))
+    end
+
+    # Normalized high-pass filter: x in 0-1, maps to cutoff = (x*12)^4
+    register(:rhpf) do |x, pat|
+      pat.hpf(Pattern.pure(x).mul(12).pow(4))
+    end
+
+    # Trancegate: random gate pattern applied to a sound.
+    # density: gate density (0-1 range, 0.5 added internally)
+    # seed: ribbon offset for pattern variety
+    # length: ribbon length for pattern variety
+    register(:trancegate) do |density, seed, length, pat|
+      density_pat = Pattern.reify(density).add(0.5)
+      # Generate gate structure using deterministic random + segment + ribbon
+      gate = Pattern.new { |state|
+        t = state.span.begin_time.to_f
+        value = Pattern.send(:time_to_rand, t)
+        [Hap.new(state.span, state.span, value)]
+      }.mul(density_pat).round.seg(16).rib(seed, length)
+
+      pat.struct(gate).fill.clip(0.7)
+    end
 
     private
 
