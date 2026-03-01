@@ -7,7 +7,7 @@ module Strudel
       OrbitState = Data.define(:delay, :duck, :reverb)
 
       attr_accessor :cps, :pattern
-      attr_reader :sample_rate
+      attr_reader :sample_rate, :current_cycle
 
       DEFAULT_CPS = 0.5 # cycles per second (1 cycle = 2 seconds)
       DEFAULT_SAMPLE_RATE = 44_100
@@ -43,12 +43,13 @@ module Strudel
         end
       end
 
-      # Generate audio frames (called by VCA)
+      # Generate audio frames: pattern evaluation + audio rendering
+      # Called from the audio writer thread (blocking write mode)
       def generate(frame_count)
         @mutex.synchronize do
-          # Convert frame count to cycle count
-          frames_per_cycle = @sample_rate / @cps
-          duration_in_cycles = Fraction.new(Rational(frame_count, frames_per_cycle.to_i))
+          # Convert frame count to cycle count using Rational to avoid cumulative drift
+          cps_r = @cps.is_a?(Rational) ? @cps : @cps.rationalize(Rational(1, 1_000_000))
+          duration_in_cycles = Fraction.new(Rational(frame_count) * cps_r / Rational(@sample_rate))
 
           end_cycle = @current_cycle + duration_in_cycles
 
