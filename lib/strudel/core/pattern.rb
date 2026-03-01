@@ -956,10 +956,27 @@ module Strudel
                         end
 
             # Combine values with operation
-            new_value = block.call(hap_left.value, hap_right.value)
+            new_value = combine_values(hap_left.value, hap_right.value, &block)
             Hap.new(new_whole, intersection, new_value)
           end
         end
+      end
+    end
+
+    # Combine two values with a binary operation.
+    # When both values are Hashes, merge them and apply the operation
+    # to shared numeric keys (Strudel-compatible behavior).
+    def combine_values(left, right, &block)
+      if left.is_a?(Hash) && right.is_a?(Hash)
+        left.merge(right) do |_key, lval, rval|
+          if lval.is_a?(Numeric) && rval.is_a?(Numeric)
+            block.call(lval, rval)
+          else
+            rval
+          end
+        end
+      else
+        block.call(left, right)
       end
     end
   end
