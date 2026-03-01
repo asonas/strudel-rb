@@ -57,6 +57,10 @@ module Strudel
         # Distortion
         @distortion = nil
 
+        # Pitch envelope
+        @penv = 0.0
+        @pdecay = 0.0
+
         # Initialize filter and envelope
         @filter = LowPassFilter.new(sample_rate: sample_rate, cutoff: @lpf_cutoff, resonance: @lpf_resonance)
         @hpf = HighPassFilter.new(sample_rate: sample_rate, cutoff: @hpf_cutoff)
@@ -76,7 +80,8 @@ module Strudel
                   fmi: nil, fmh: nil, fmwave: nil,
                   lpf: nil, lpq: nil, lpenv: nil, lpa: nil, lpd: nil, lps: nil, lpr: nil,
                   hpf: nil,
-                  distort: nil, distorttype: nil, distortvol: nil)
+                  distort: nil, distorttype: nil, distortvol: nil,
+                  penv: nil, pdecay: nil, pattack: nil, psustain: nil, panchor: nil)
         @frequency = if note
                        midi_to_frequency(note)
                      elsif frequency
@@ -113,6 +118,10 @@ module Strudel
         else
           @distortion = nil
         end
+
+        # Pitch envelope
+        @penv = (penv || 0.0).to_f
+        @pdecay = (pdecay || 0.0).to_f
 
         # Update filter settings
         @filter.cutoff = @lpf_cutoff
@@ -164,12 +173,17 @@ module Strudel
 
         samples =
           if @fmi && @fmi != 0.0 && @fm_oscillator
-            Array.new(frame_count) do
-              base_freq = @frequency
+            Array.new(frame_count) do |i|
+              base_freq = pitch_envelope_frequency(@frequency, (@elapsed_samples + i) / @sample_rate.to_f)
               modfreq = base_freq * @fmh
               mod = @fm_oscillator.step(modfreq)
               freq = base_freq + mod * modfreq * @fmi
               @oscillator.step([freq, 0.0].max)
+            end
+          elsif @penv != 0.0 && @pdecay > 0.0
+            Array.new(frame_count) do |i|
+              freq = pitch_envelope_frequency(@frequency, (@elapsed_samples + i) / @sample_rate.to_f)
+              @oscillator.step(freq)
             end
           else
             @oscillator.generate(frequency: @frequency, frame_count: frame_count)
@@ -226,6 +240,15 @@ module Strudel
 
       def midi_to_frequency(note)
         A4_FREQUENCY * (2.0**((note - A4_MIDI_NOTE) / 12.0))
+      end
+
+      # Apply pitch envelope: exponential decay from penv semitones to 0
+      def pitch_envelope_frequency(base_freq, elapsed_time)
+        return base_freq if @penv == 0.0 || @pdecay <= 0.0
+
+        envelope = Math.exp(-elapsed_time / @pdecay)
+        semitone_offset = @penv * envelope
+        base_freq * (2.0**(semitone_offset / 12.0))
       end
 
       def decay_envelope(time)

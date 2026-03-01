@@ -115,6 +115,7 @@ module Strudel
           distort_params = extract_distort_params(value)
           amp_params = extract_amp_params(value)
           fm_params = extract_fm_params(value)
+          pitch_env_params = extract_pitch_env_params(value)
 
           player = Audio::SynthPlayer.new(
             sound_name.to_sym,
@@ -133,7 +134,8 @@ module Strudel
             **fm_params,
             **lpf_params,
             **hpf_params,
-            **distort_params
+            **distort_params,
+            **pitch_env_params
           )
           apply_orbit_delay(orbit, delay_params) if delay_params
           apply_orbit_reverb(orbit, reverb_params) if reverb_params
@@ -358,6 +360,18 @@ module Strudel
         params[:fmi] = value[:fmi] if value[:fmi]
         params[:fmh] = value[:fmh] if value[:fmh]
         params[:fmwave] = value[:fmwave] if value[:fmwave]
+        params
+      end
+
+      def extract_pitch_env_params(value)
+        return {} unless value.is_a?(Hash)
+
+        params = {}
+        params[:penv] = value[:penv] if value[:penv]
+        params[:pdecay] = value[:pdecay] if value[:pdecay]
+        params[:pattack] = value[:pattack] if value[:pattack]
+        params[:psustain] = value[:psustain] if value[:psustain]
+        params[:panchor] = value[:panchor] if value[:panchor]
         params
       end
 
