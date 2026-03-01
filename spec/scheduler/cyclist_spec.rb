@@ -16,6 +16,23 @@ describe Strudel::Scheduler::Cyclist do
     assert_equal 100, right.length
   end
 
+  it "advances cycle position without cumulative drift using Rational arithmetic" do
+    # cps=0.55 だと frames_per_cycle=80181.818... → .to_i=80181 で誤差が生じる
+    cyclist = Strudel::Scheduler::Cyclist.new(sample_rate: 44100, cps: 0.55)
+    dsl = Object.new.extend(Strudel::DSL)
+    pat = dsl.sound("bd")
+    cyclist.set_pattern(pat)
+
+    # 1000回 generate(128) を呼んだ後のサイクル位置を検証
+    1000.times { cyclist.generate(128) }
+
+    # 期待値: 128000 frames / 44100 Hz * 0.55 cps = 128000 * 0.55 / 44100
+    expected = Rational(128_000) * Rational(55, 100) / Rational(44_100)
+    actual = cyclist.current_cycle.value
+
+    assert_equal expected, actual
+  end
+
   it "applies Strudel-like pan curve (cos/sin) to stereo output" do
     dsl = Object.new.extend(Strudel::DSL)
 

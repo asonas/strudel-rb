@@ -372,7 +372,7 @@ module Strudel
         [Hap.new(state.span, state.span, value)]
       }.mul(density_pat).round.seg(16).rib(seed, length)
 
-      pat.struct(gate).fill.clip(0.7)
+      pat.struct(gate).clip(0.7)
     end
 
     # Polyphonic pitch glide: smoothly slides pitch from previous note to current.
