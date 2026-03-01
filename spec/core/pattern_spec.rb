@@ -447,4 +447,84 @@ describe Strudel::Pattern do
       assert_equal 200, haps.first.value[:hpf]
     end
   end
+
+  describe "#struct" do
+    it "preserves all events when bool pattern is all true" do
+      pattern = Strudel::Pattern.fastcat("bd", "sd").struct(
+        Strudel::Pattern.fastcat(true, true)
+      )
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 2, haps.length
+      assert_equal "bd", haps[0].value
+      assert_equal "sd", haps[1].value
+    end
+
+    it "filters out events where bool pattern is false" do
+      pattern = Strudel::Pattern.fastcat("bd", "sd", "hh", "cp").struct(
+        Strudel::Pattern.fastcat(true, false, true, false)
+      )
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 2, haps.length
+      assert_equal "bd", haps[0].value
+      assert_equal "hh", haps[1].value
+    end
+
+    it "applies structure from bool pattern to a pure pattern" do
+      # A single "bd" distributed across a 3-in-8 euclidean structure
+      pattern = Strudel::Pattern.pure("bd").struct(
+        Strudel::Pattern.euclid(3, 8)
+      )
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 3, haps.length
+      haps.each { |h| assert_equal "bd", h.value }
+    end
+
+    it "works with hash values" do
+      pattern = Strudel::Pattern.pure({ s: "bd", n: 0 }).struct(
+        Strudel::Pattern.fastcat(true, false, true, false)
+      )
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 2, haps.length
+      assert_equal({ s: "bd", n: 0 }, haps[0].value)
+      assert_equal({ s: "bd", n: 0 }, haps[1].value)
+    end
+  end
+
+  describe "#euclid" do
+    it "applies euclidean rhythm structure to the pattern" do
+      pattern = Strudel::Pattern.pure("bd").euclid(3, 8)
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 3, haps.length
+      haps.each { |h| assert_equal "bd", h.value }
+    end
+
+    it "preserves hash values from the original pattern" do
+      pattern = Strudel::Pattern.pure({ s: "bd", n: 0 }).euclid(3, 8)
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 3, haps.length
+      haps.each { |h| assert_equal({ s: "bd", n: 0 }, h.value) }
+    end
+
+    it "supports rotation" do
+      # euclid(3, 8) without rotation: positions 0, 3, 6
+      no_rotation = Strudel::Pattern.pure("bd").euclid(3, 8)
+      haps_no_rot = no_rotation.query_arc(0, 1)
+
+      # euclid(3, 8, 1) with rotation=1: positions shifted by 1
+      with_rotation = Strudel::Pattern.pure("bd").euclid(3, 8, 1)
+      haps_rot = with_rotation.query_arc(0, 1)
+
+      assert_equal 3, haps_rot.length
+      # Rotated positions should differ from non-rotated
+      positions_no_rot = haps_no_rot.map { |h| h.whole.begin_time.value }
+      positions_rot = haps_rot.map { |h| h.whole.begin_time.value }
+      refute_equal positions_no_rot, positions_rot
+    end
+  end
 end

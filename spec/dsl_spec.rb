@@ -97,6 +97,24 @@ describe Strudel::DSL do
     end
   end
 
+  describe "Pattern#euclid with DSL" do
+    it "applies euclidean rhythm to note pattern" do
+      pattern = note("c3").euclid(3, 8)
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 3, haps.length
+      haps.each { |h| assert_equal 48, h.value[:note] }
+    end
+
+    it "applies euclidean rhythm to sound pattern" do
+      pattern = sound("bd").euclid(3, 8)
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 3, haps.length
+      haps.each { |h| assert_equal "bd", h.value[:s] }
+    end
+  end
+
   describe "#pure" do
     it "creates a pure pattern" do
       pattern = pure("bd")
