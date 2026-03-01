@@ -73,6 +73,40 @@ describe Strudel::Audio::SynthPlayer do
     end
   end
 
+  describe "HPF support" do
+    it "accepts hpf parameter and attenuates low frequencies" do
+      # Without HPF
+      player_no_hpf = Strudel::Audio::SynthPlayer.new(:sawtooth, sample_rate: 44_100)
+      player_no_hpf.trigger(frequency: 100, duration: 0.1)
+      samples_no_hpf = player_no_hpf.generate(4410).first
+
+      # With HPF at 5000 Hz
+      player_hpf = Strudel::Audio::SynthPlayer.new(:sawtooth, sample_rate: 44_100)
+      player_hpf.trigger(frequency: 100, duration: 0.1, hpf: 5000.0)
+      samples_hpf = player_hpf.generate(4410).first
+
+      rms_no_hpf = Math.sqrt(samples_no_hpf.sum { |s| s * s } / samples_no_hpf.length)
+      rms_hpf = Math.sqrt(samples_hpf.sum { |s| s * s } / samples_hpf.length)
+
+      assert rms_hpf < rms_no_hpf, "HPF should reduce energy of a low-frequency signal"
+    end
+  end
+
+  describe "Distortion support" do
+    it "accepts distort parameter and changes the waveform" do
+      player_clean = Strudel::Audio::SynthPlayer.new(:sine, sample_rate: 44_100)
+      player_clean.trigger(frequency: 440, duration: 0.1)
+      samples_clean = player_clean.generate(1000).first
+
+      player_dist = Strudel::Audio::SynthPlayer.new(:sine, sample_rate: 44_100)
+      player_dist.trigger(frequency: 440, duration: 0.1, distort: 5.0, distorttype: "sinefold")
+      samples_dist = player_dist.generate(1000).first
+
+      refute_equal samples_clean, samples_dist
+      assert samples_dist.all?(&:finite?)
+    end
+  end
+
   describe "#stop" do
     it "stops the player" do
       player = Strudel::Audio::SynthPlayer.new(:sine)

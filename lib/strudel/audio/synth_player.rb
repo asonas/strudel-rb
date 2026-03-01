@@ -13,6 +13,7 @@ module Strudel
       DEFAULT_LPF_CUTOFF = 20_000.0  # Wide open by default
       DEFAULT_LPF_RESONANCE = 1.0
       DEFAULT_LPF_ENV = 0.0
+      DEFAULT_HPF_CUTOFF = 20.0     # Wide open by default (pass everything)
 
       # Default gain envelope (Strudel/superdough defaults for synth waveforms)
       DEFAULT_AMP_ATTACK = 0.001
@@ -50,8 +51,15 @@ module Strudel
         @lpf_sustain = 0.0
         @lpf_release = 0.1
 
+        # HPF settings
+        @hpf_cutoff = DEFAULT_HPF_CUTOFF
+
+        # Distortion
+        @distortion = nil
+
         # Initialize filter and envelope
         @filter = LowPassFilter.new(sample_rate: sample_rate, cutoff: @lpf_cutoff, resonance: @lpf_resonance)
+        @hpf = HighPassFilter.new(sample_rate: sample_rate, cutoff: @hpf_cutoff)
         @filter_envelope = FilterEnvelope.new(sample_rate: sample_rate)
         @amp_envelope = ADSREnvelope.new(
           sample_rate: sample_rate,
@@ -66,7 +74,9 @@ module Strudel
                   duration: nil,
                   attack: nil, decay: nil, sustain: nil, release: nil,
                   fmi: nil, fmh: nil, fmwave: nil,
-                  lpf: nil, lpq: nil, lpenv: nil, lpa: nil, lpd: nil, lps: nil, lpr: nil)
+                  lpf: nil, lpq: nil, lpenv: nil, lpa: nil, lpd: nil, lps: nil, lpr: nil,
+                  hpf: nil,
+                  distort: nil, distorttype: nil, distortvol: nil)
         @frequency = if note
                        midi_to_frequency(note)
                      elsif frequency
@@ -93,10 +103,23 @@ module Strudel
         @lpf_sustain = lps if lps
         @lpf_release = lpr if lpr
 
+        # HPF parameter
+        @hpf_cutoff = hpf if hpf
+
+        # Distortion
+        if distort && distort > 0
+          dtype = (distorttype || "sinefold").to_s.to_sym
+          @distortion = Distortion.new(amount: distort.to_f, type: dtype, post_gain: (distortvol || 1.0).to_f)
+        else
+          @distortion = nil
+        end
+
         # Update filter settings
         @filter.cutoff = @lpf_cutoff
         @filter.resonance = @lpf_resonance
         @filter.reset
+        @hpf.cutoff = @hpf_cutoff
+        @hpf.reset
 
         # Setup filter envelope
         @filter_envelope.configure(
@@ -172,8 +195,10 @@ module Strudel
               modulated_cutoff = @filter_envelope.process
               @filter.cutoff = modulated_cutoff
 
-              # Apply filter
+              # Apply LPF then HPF
               filtered_sample = @filter.process_sample(sample)
+              filtered_sample = @hpf.process_sample(filtered_sample)
+              filtered_sample = @distortion.process_sample(filtered_sample) if @distortion
 
               filtered_sample * amp_envelope * @gain * DEFAULT_AMP_LEVEL
             end
@@ -185,8 +210,9 @@ module Strudel
             modulated_cutoff = @filter_envelope.process
             @filter.cutoff = modulated_cutoff
 
-            # Apply filter
+            # Apply LPF then HPF
             filtered_sample = @filter.process_sample(sample)
+            filtered_sample = @hpf.process_sample(filtered_sample)
 
             filtered_sample * amp_envelope * @gain * DEFAULT_AMP_LEVEL
           end

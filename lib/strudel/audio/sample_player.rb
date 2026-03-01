@@ -16,13 +16,16 @@ module Strudel
         @released = false
         @hold_duration = nil
         @amp_envelope = ADSREnvelope.new(sample_rate: target_sample_rate)
+        @hpf_l = HighPassFilter.new(sample_rate: target_sample_rate, cutoff: 20.0)
+        @hpf_r = HighPassFilter.new(sample_rate: target_sample_rate, cutoff: 20.0)
+        @hpf_cutoff = 20.0
 
         # Base sample rate conversion ratio
         @base_rate_ratio = sample_data.sample_rate.to_f / target_sample_rate
       end
 
       # Start playback
-      def trigger(gain: 1.0, speed: 1.0, duration: nil, attack: nil, decay: nil, sustain: nil, release: nil)
+      def trigger(gain: 1.0, speed: 1.0, duration: nil, attack: nil, decay: nil, sustain: nil, release: nil, hpf: nil)
         @position = 0.0
         @playing = true
         @gain = gain
@@ -39,6 +42,13 @@ module Strudel
         @amp_envelope.sustain = s
         @amp_envelope.release = r
         @amp_envelope.trigger
+
+        # HPF
+        @hpf_cutoff = hpf if hpf
+        @hpf_l.cutoff = @hpf_cutoff
+        @hpf_l.reset
+        @hpf_r.cutoff = @hpf_cutoff
+        @hpf_r.reset
       end
 
       # Stop playback
@@ -89,8 +99,15 @@ module Strudel
           current_r = right_src[idx] || 0.0
           next_r = right_src[idx + 1] || current_r
           amp = @hold_duration ? @amp_envelope.process : 1.0
-          out_l[i] = (current_l + (next_l - current_l) * frac) * @gain * amp
-          out_r[i] = (current_r + (next_r - current_r) * frac) * @gain * amp
+          sample_l = (current_l + (next_l - current_l) * frac)
+          sample_r = (current_r + (next_r - current_r) * frac)
+          # Apply HPF if cutoff is above minimum
+          if @hpf_cutoff > 20.0
+            sample_l = @hpf_l.process_sample(sample_l)
+            sample_r = @hpf_r.process_sample(sample_r)
+          end
+          out_l[i] = sample_l * @gain * amp
+          out_r[i] = sample_r * @gain * amp
 
           # For reverse playback (negative speed), move in reverse direction
           @position += @speed >= 0 ? rate_ratio : -rate_ratio

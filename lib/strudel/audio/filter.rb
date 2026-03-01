@@ -110,6 +110,98 @@ module Strudel
       end
     end
 
+    # Biquad high-pass filter (IIR)
+    class HighPassFilter
+      attr_reader :cutoff, :resonance
+
+      CUTOFF_SMOOTHING = 0.99
+
+      def initialize(sample_rate: 44_100, cutoff: 20.0, resonance: 0.0)
+        @sample_rate = sample_rate
+        @target_cutoff = cutoff.clamp(20.0, 20_000.0)
+        @cutoff = @target_cutoff
+        @resonance = resonance.clamp(0.0, 50.0)
+        @y1 = 0.0
+        @y2 = 0.0
+        @x1 = 0.0
+        @x2 = 0.0
+        @coefficients_dirty = true
+        update_coefficients
+      end
+
+      def cutoff=(value)
+        @target_cutoff = value.clamp(20.0, 20_000.0)
+      end
+
+      def resonance=(value)
+        new_resonance = value.clamp(0.0, 50.0)
+        if new_resonance != @resonance
+          @resonance = new_resonance
+          @coefficients_dirty = true
+        end
+      end
+
+      def process(samples)
+        samples.map { |sample| process_sample(sample) }
+      end
+
+      def process_sample(input)
+        if (@cutoff - @target_cutoff).abs > 1.0
+          @cutoff = @cutoff * CUTOFF_SMOOTHING + @target_cutoff * (1.0 - CUTOFF_SMOOTHING)
+          @coefficients_dirty = true
+        elsif @cutoff != @target_cutoff
+          @cutoff = @target_cutoff
+          @coefficients_dirty = true
+        end
+
+        update_coefficients if @coefficients_dirty
+
+        output = @b0 * input + @b1 * @x1 + @b2 * @x2 - @a1 * @y1 - @a2 * @y2
+
+        @x2 = @x1
+        @x1 = input
+        @y2 = @y1
+        @y1 = output
+
+        output.clamp(-2.0, 2.0)
+      end
+
+      def reset
+        @y1 = 0.0
+        @y2 = 0.0
+        @x1 = 0.0
+        @x2 = 0.0
+      end
+
+      private
+
+      def update_coefficients
+        @coefficients_dirty = false
+
+        freq = @cutoff.clamp(20.0, @sample_rate * 0.45)
+        omega = 2.0 * Math::PI * freq / @sample_rate
+        sin_omega = Math.sin(omega)
+        cos_omega = Math.cos(omega)
+
+        q = [@resonance, 0.5].max
+        alpha = sin_omega / (2.0 * q)
+
+        # High-pass coefficients
+        b0 = (1.0 + cos_omega) / 2.0
+        b1 = -(1.0 + cos_omega)
+        b2 = (1.0 + cos_omega) / 2.0
+        a0 = 1.0 + alpha
+        a1 = -2.0 * cos_omega
+        a2 = 1.0 - alpha
+
+        @b0 = b0 / a0
+        @b1 = b1 / a0
+        @b2 = b2 / a0
+        @a1 = a1 / a0
+        @a2 = a2 / a0
+      end
+    end
+
     # ADSR Envelope for filter modulation
     class FilterEnvelope
       attr_reader :attack, :decay, :sustain, :release, :env, :anchor
