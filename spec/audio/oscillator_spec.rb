@@ -53,5 +53,23 @@ describe Strudel::Audio::Oscillator do
       assert_equal 100, samples.length
       assert samples.all?(&:finite?)
     end
+
+    it "generates brown noise samples" do
+      osc = Strudel::Audio::Oscillator.new(:brown, sample_rate: 44100)
+      samples = osc.generate(frequency: 440, frame_count: 100)
+
+      assert_equal 100, samples.length
+      assert samples.all?(&:finite?)
+      assert samples.all? { |s| s >= -1.0 && s <= 1.0 }
+    end
+
+    it "generates brown noise via step" do
+      osc = Strudel::Audio::Oscillator.new(:brown, sample_rate: 44100)
+      samples = Array.new(100) { osc.step(440) }
+
+      assert_equal 100, samples.length
+      assert samples.all?(&:finite?)
+      assert samples.all? { |s| s >= -1.0 && s <= 1.0 }
+    end
   end
 end

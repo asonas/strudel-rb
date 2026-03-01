@@ -217,6 +217,25 @@ describe Strudel::Pattern do
       assert_equal 4, haps[0].value # 3 + 1
       assert_equal 5, haps[1].value # 3 + 2
     end
+
+    it "merges Hash values, adding shared numeric keys" do
+      left = Strudel::Pattern.pure({ note: 60, s: "sine" })
+      right = Strudel::Pattern.pure({ note: -12 })
+      pattern = left.add(right)
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal 1, haps.length
+      assert_equal({ note: 48, s: "sine" }, haps.first.value)
+    end
+
+    it "keeps right-only keys when merging Hashes" do
+      left = Strudel::Pattern.pure({ s: "sine" })
+      right = Strudel::Pattern.pure({ note: -12 })
+      pattern = left.add(right)
+      haps = pattern.query_arc(0, 1)
+
+      assert_equal({ s: "sine", note: -12 }, haps.first.value)
+    end
   end
 
   describe "#sub" do

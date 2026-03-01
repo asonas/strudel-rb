@@ -3,7 +3,7 @@
 module Strudel
   module Audio
     class Oscillator
-      WAVEFORMS = %i[sine sawtooth square triangle supersaw white].freeze
+      WAVEFORMS = %i[sine sawtooth square triangle supersaw white brown].freeze
       # Match Strudel(superdough) default supersaw voices.
       SUPERSAW_VOICES = 5
       # Match Strudel(superdough) default detune (= freqspread, semitones).
@@ -21,6 +21,7 @@ module Strudel
         @phase = 0.0
         @detune = detune
         @noise_rng = Random.new
+        @brown_value = 0.0
         @supersaw_voices = (voices || SUPERSAW_VOICES).to_i.clamp(1, 100)
         # For supersaw: separate phases for each voice
         @supersaw_phases = Array.new(@supersaw_voices) { Random.rand }
@@ -29,6 +30,10 @@ module Strudel
       def generate(frequency:, frame_count:)
         if @waveform == :white
           return Array.new(frame_count) { @noise_rng.rand * 2.0 - 1.0 }
+        end
+
+        if @waveform == :brown
+          return Array.new(frame_count) { step_brown }
         end
 
         phase_increment = frequency / @sample_rate.to_f
@@ -49,6 +54,7 @@ module Strudel
       def step(frequency)
         frequency = frequency.to_f
         return @noise_rng.rand * 2.0 - 1.0 if @waveform == :white
+        return step_brown if @waveform == :brown
 
         if @waveform == :supersaw
           step_supersaw(frequency)
@@ -63,10 +69,17 @@ module Strudel
 
       def reset
         @phase = 0.0
+        @brown_value = 0.0
         @supersaw_phases = Array.new(@supersaw_voices) { Random.rand }
       end
 
       private
+
+      # Brown noise: random walk clamped to [-1, 1]
+      def step_brown
+        @brown_value += (@noise_rng.rand * 2.0 - 1.0) * 0.05
+        @brown_value = @brown_value.clamp(-1.0, 1.0)
+      end
 
       # polyBLEP antialiasing (ported from Strudel/supradough)
       def poly_blep(t, dt)
