@@ -375,6 +375,58 @@ module Strudel
       pat.struct(gate).fill.clip(0.7)
     end
 
+    # Polyphonic pitch glide: smoothly slides pitch from previous note to current.
+    # time: glide duration in seconds
+    register(:glide) do |time, pat|
+      curr = []
+      prev = []
+      last_t = nil
+
+      # Convert hap value to frequency (mirrors Strudel's getFrequencyFromValue)
+      freq_from = ->(value) {
+        return nil unless value.is_a?(Hash)
+
+        note = value[:note] || 36
+        freq = value[:freq]
+        note = Theory::Note.parse(note) || 36 if note.is_a?(String)
+        freq ||= 440.0 * (2.0**((note.to_f - 69) / 12.0)) if note.is_a?(Numeric)
+        freq
+      }
+
+      Pattern.new do |state|
+        haps = pat.query(state)
+        output = []
+
+        haps.each do |hap|
+          next output << hap unless hap.value.is_a?(Hash)
+
+          t = hap.whole&.begin_time&.to_f
+          if t && (last_t.nil? || last_t != t)
+            prev = curr.dup
+            curr = []
+            last_t = t
+          end
+
+          freq = freq_from.call(hap.value)
+          curr << freq if freq
+
+          new_value = hap.value.merge(pdecay: time)
+
+          if freq && prev.any?
+            closest = prev.min_by { |f| (f - freq).abs }
+            if (closest - freq).abs > 1e-6
+              penv = -12.0 * Math.log2(freq / closest)
+              new_value = new_value.merge(penv: penv, pattack: 0, psustain: 0, panchor: 0)
+            end
+          end
+
+          output << Hap.new(hap.whole, hap.part, new_value, hap.context)
+        end
+
+        output
+      end
+    end
+
     private
 
     # Port of Strudel's timeToRand (packages/core/signal.mjs)

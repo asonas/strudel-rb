@@ -107,6 +107,33 @@ describe Strudel::Audio::SynthPlayer do
     end
   end
 
+  describe "Pitch envelope (glide) support" do
+    it "accepts penv and pdecay parameters" do
+      player = Strudel::Audio::SynthPlayer.new(:sine, sample_rate: 44_100)
+      # penv = 12 means start 12 semitones (1 octave) above target
+      player.trigger(frequency: 440, duration: 0.1, penv: 12.0, pdecay: 0.03)
+      assert player.playing?
+    end
+
+    it "starts at offset frequency and decays to target" do
+      sample_rate = 44_100
+
+      # Without pitch envelope
+      player_no_env = Strudel::Audio::SynthPlayer.new(:sine, sample_rate: sample_rate)
+      player_no_env.trigger(frequency: 440, duration: 0.1)
+      samples_no_env = player_no_env.generate(100).first
+
+      # With pitch envelope: start 12 semitones above (880Hz -> 440Hz)
+      player_env = Strudel::Audio::SynthPlayer.new(:sine, sample_rate: sample_rate)
+      player_env.trigger(frequency: 440, duration: 0.1, penv: 12.0, pdecay: 0.05)
+      samples_env = player_env.generate(100).first
+
+      # The samples should differ because the pitch envelope changes the frequency
+      refute_equal samples_no_env, samples_env
+      assert samples_env.all?(&:finite?)
+    end
+  end
+
   describe "#stop" do
     it "stops the player" do
       player = Strudel::Audio::SynthPlayer.new(:sine)
