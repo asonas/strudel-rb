@@ -64,6 +64,31 @@ describe Strudel::Audio::SamplePlayer do
     end
   end
 
+  describe "default ADSR values" do
+    it "uses flat envelope (sustain=1.0) matching Strudel JS defaults" do
+      # Create a sample with constant amplitude 1.0
+      sr = 1000
+      samples = [1.0] * 500
+      data = DummySampleData.new([samples], sr)
+      player = Strudel::Audio::SamplePlayer.new(data, sr)
+
+      # Trigger with duration but no explicit ADSR params
+      # Default ADSR should be [0.001, 0.001, 1.0, 0.01]
+      player.trigger(gain: 1.0, duration: 0.3)
+
+      # Skip the attack+decay phase (first ~2ms = ~2 samples at 1000Hz)
+      player.generate(3)
+
+      # Read samples during the sustain phase
+      sustain_out = player.generate(100).first
+
+      # With sustain=1.0, amplitude should be very close to 1.0 (gain * sustain * sample)
+      avg_amplitude = sustain_out.sum / sustain_out.length.to_f
+      assert_in_delta 1.0, avg_amplitude, 0.05,
+        "Default sustain should be 1.0 (flat envelope preserving natural sample volume)"
+    end
+  end
+
   describe "HPF support" do
     it "accepts hpf parameter and attenuates low frequencies" do
       # Generate a low-frequency sine wave as sample data
