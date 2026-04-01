@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "json"
 require "wavefile"
 
 module Strudel
@@ -8,12 +9,25 @@ module Strudel
       def initialize(samples_path = nil)
         @samples_path = samples_path || default_samples_path
         @cache = {}
+        @pitch_cache = {}
       end
 
       # Get sample (with caching)
       def get(name, n = 0)
         key = "#{name}:#{n}"
         @cache[key] ||= load_sample(name, n)
+      end
+
+      # Get pitch mapping for a sample set
+      # Returns {0 => 60, 1 => 72} or nil if no pitch.json
+      def pitch_map(name)
+        return @pitch_cache[name] if @pitch_cache.key?(name)
+
+        path = File.join(@samples_path, name, "pitch.json")
+        @pitch_cache[name] = if File.exist?(path)
+                               raw = JSON.parse(File.read(path))
+                               raw.each_with_object({}) { |(k, v), h| h[k.to_i] = v.to_i }
+                             end
       end
 
       private
