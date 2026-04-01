@@ -113,6 +113,46 @@ describe Strudel::Audio::SamplePlayer do
     end
   end
 
+  describe "full length playback when duration is nil" do
+    it "plays the entire sample without early release when duration is nil" do
+      sr = 1000
+      sample_length = 200
+      samples = [0.5] * sample_length
+      data = DummySampleData.new([samples], sr)
+      player = Strudel::Audio::SamplePlayer.new(data, sr)
+
+      # Trigger with no duration - sample should play its full natural length
+      player.trigger(gain: 1.0, duration: nil)
+
+      # Generate half of the sample
+      left, _ = player.generate(100)
+      assert player.playing?, "Player should still be playing at halfway point"
+      left.each { |s| assert_in_delta 0.5, s, 0.01 }
+
+      # Generate past the end of the sample (request more frames than remain)
+      left2, _ = player.generate(150)
+      # Player should stop once sample data is exhausted
+      refute player.playing?, "Player should stop after sample data ends"
+    end
+
+    it "cuts sample short when duration is set" do
+      sr = 1000
+      sample_length = 500
+      samples = [0.5] * sample_length
+      data = DummySampleData.new([samples], sr)
+      player = Strudel::Audio::SamplePlayer.new(data, sr)
+
+      # Trigger with short duration (0.1s = 100 samples at 1000Hz)
+      player.trigger(gain: 1.0, duration: 0.1)
+
+      # Generate past the duration + release time
+      player.generate(200)
+
+      # Player should have stopped due to envelope release
+      refute player.playing?, "Player should stop after duration + release"
+    end
+  end
+
   describe "#generate" do
     it "produces audio samples" do
       data = DummySampleData.new([[0.5] * 100])

@@ -68,6 +68,83 @@ describe Strudel::Scheduler::Cyclist do
       "note() with sample should produce pitch-shifted (different) output"
   end
 
+  it "passes nil duration to sample player when clip/loop/release are not set" do
+    fixtures_path = File.expand_path("../fixtures/samples", __dir__)
+    dsl = Object.new.extend(Strudel::DSL)
+
+    # Single event pattern so we can track exactly one player
+    cyclist = Strudel::Scheduler::Cyclist.new(
+      sample_rate: 44100,
+      cps: 2.0, # fast cps -> event_duration = 1/(1*2.0) = 0.5s (1 event per cycle)
+      samples_path: fixtures_path
+    )
+    pat = dsl.s("unpitched_test")
+    cyclist.set_pattern(pat)
+
+    # Trigger the event
+    cyclist.generate(256)
+
+    # Get the active player and check its hold_duration
+    active = cyclist.instance_variable_get(:@active_players)
+    assert active.length > 0, "Should have at least one active player"
+
+    player = active.first.player
+    hold_duration = player.instance_variable_get(:@hold_duration)
+    assert_nil hold_duration,
+      "hold_duration should be nil when clip/loop/release are not set (sample plays full length)"
+  end
+
+  it "passes event duration to sample player when clip is set" do
+    fixtures_path = File.expand_path("../fixtures/samples", __dir__)
+    dsl = Object.new.extend(Strudel::DSL)
+
+    cyclist = Strudel::Scheduler::Cyclist.new(
+      sample_rate: 44100,
+      cps: 2.0,
+      samples_path: fixtures_path
+    )
+    # clip(1) means duration = 1 * event_duration
+    pat = dsl.s("unpitched_test").clip(1)
+    cyclist.set_pattern(pat)
+
+    # Trigger the event
+    cyclist.generate(256)
+
+    # Get the active player and check its hold_duration
+    active = cyclist.instance_variable_get(:@active_players)
+    assert active.length > 0, "Should have at least one active player"
+
+    player = active.first.player
+    hold_duration = player.instance_variable_get(:@hold_duration)
+    refute_nil hold_duration,
+      "hold_duration should be set when clip is specified"
+    assert hold_duration > 0,
+      "hold_duration should be positive"
+  end
+
+  it "passes event duration to sample player when release is explicitly set" do
+    fixtures_path = File.expand_path("../fixtures/samples", __dir__)
+    dsl = Object.new.extend(Strudel::DSL)
+
+    cyclist = Strudel::Scheduler::Cyclist.new(
+      sample_rate: 44100,
+      cps: 2.0,
+      samples_path: fixtures_path
+    )
+    pat = dsl.s("unpitched_test").release(0.1)
+    cyclist.set_pattern(pat)
+
+    cyclist.generate(256)
+
+    active = cyclist.instance_variable_get(:@active_players)
+    assert active.length > 0, "Should have at least one active player"
+
+    player = active.first.player
+    hold_duration = player.instance_variable_get(:@hold_duration)
+    refute_nil hold_duration,
+      "hold_duration should be set when release is explicitly specified"
+  end
+
   it "applies Strudel-like pan curve (cos/sin) to stereo output" do
     dsl = Object.new.extend(Strudel::DSL)
 
