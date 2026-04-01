@@ -27,4 +27,36 @@ describe Strudel::Audio::SampleBank do
       assert_same first, second
     end
   end
+
+  describe "#get_pitched" do
+    it "picks closest sample and calculates speed for E4 (64)" do
+      sample, speed = bank.get_pitched("pitched_test", 64)
+
+      refute sample.empty?
+      # E4=64, closest is 0.wav (C4=60), speed = 2^(4/12) ≈ 1.2599
+      assert_in_delta 1.2599, speed, 0.001
+    end
+
+    it "picks closest sample and calculates speed for B4 (71)" do
+      sample, speed = bank.get_pitched("pitched_test", 71)
+
+      refute sample.empty?
+      # B4=71, closest is 1.wav (C5=72), speed = 2^(-1/12) ≈ 0.9439
+      assert_in_delta 0.9439, speed, 0.001
+    end
+
+    it "returns speed 1.0 for exact match C4 (60)" do
+      sample, speed = bank.get_pitched("pitched_test", 60)
+
+      refute sample.empty?
+      assert_in_delta 1.0, speed, 0.0001
+    end
+
+    it "falls back with speed 1.0 for unpitched sound" do
+      sample, speed = bank.get_pitched("unpitched_test", 64)
+
+      refute sample.empty?
+      assert_in_delta 1.0, speed, 0.0001
+    end
+  end
 end

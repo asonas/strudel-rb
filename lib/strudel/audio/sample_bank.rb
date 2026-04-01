@@ -30,6 +30,22 @@ module Strudel
                              end
       end
 
+      # Get sample with pitch-shift speed for a target MIDI note
+      # Returns [sample_data, speed_ratio]
+      def get_pitched(name, target_note)
+        mapping = pitch_map(name)
+
+        unless mapping
+          return [get(name, 0), 1.0]
+        end
+
+        closest_n = mapping.min_by { |_n, base_note| (base_note - target_note).abs }.first
+        base_note = mapping[closest_n]
+        speed = 2.0**((target_note - base_note) / 12.0)
+
+        [get(name, closest_n), speed]
+      end
+
       private
 
       def default_samples_path
