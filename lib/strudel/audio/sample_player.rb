@@ -35,7 +35,7 @@ module Strudel
         @hold_duration = duration
 
         # Amp ADSR (Strudel-like defaults)
-        a, d, s, r = resolve_adsr(attack, decay, sustain, release, default_values: [0.001, 0.05, 0.6, 0.01])
+        a, d, s, r = resolve_adsr(attack, decay, sustain, release, default_values: [0.001, 0.001, 1.0, 0.01])
         @amp_envelope.reset
         @amp_envelope.attack = a
         @amp_envelope.decay = d
