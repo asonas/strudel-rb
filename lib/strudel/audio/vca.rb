@@ -2,6 +2,21 @@
 
 require "ffi-portaudio"
 
+# Re-attach Pa_WriteStream with blocking: true so that the GVL is released
+# while the native call waits for the audio device.  The upstream ffi-portaudio
+# gem does not set this flag, which causes the audio thread to monopolise the
+# GVL and starve other threads (e.g. the listen-gem file watcher).
+module FFI
+  module PortAudio
+    module API
+      attach_function :Pa_WriteStream,
+                      [:pointer, :pointer, :ulong],
+                      :PaErrorCode,
+                      blocking: true
+    end
+  end
+end
+
 module Strudel
   module Audio
     # Blocking-write audio output.
@@ -9,8 +24,8 @@ module Strudel
     # Instead of using a PortAudio callback (which requires the GVL and therefore
     # competes with the Ruby scheduler thread), this class opens the stream in
     # blocking I/O mode and writes pre-generated audio via Pa_WriteStream.
-    # Pa_WriteStream is a native C call that releases the GVL while waiting for
-    # the device, so no GVL contention occurs.
+    # Pa_WriteStream is re-attached above with blocking: true so that the GVL is
+    # released while the native call waits for the device.
     class VCA
       include FFI::PortAudio
 
@@ -128,7 +143,7 @@ module Strudel
           end
 
           # Pa_WriteStream blocks until the device consumes the buffer.
-          # As a native C call, it releases the GVL while waiting.
+          # blocking: true (set above) releases the GVL while waiting.
           err = API.Pa_WriteStream(@stream_ptr, buf, @buffer_size)
           if err != :paNoError && err != :paOutputUnderflowed
             warn "Pa_WriteStream: #{API.Pa_GetErrorText(err)}"
