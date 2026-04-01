@@ -146,10 +146,17 @@ module Strudel
         end
 
         # For sample sounds
-        sample_data = @sample_bank.get(sound_name, sample_n)
-        return if sample_data.empty?
+        note_val = value.is_a?(Hash) ? value[:note] : nil
+        if note_val
+          sample_data, pitch_speed = @sample_bank.get_pitched(sound_name, note_val)
+          return if sample_data.empty?
+          speed = extract_speed(value) * pitch_speed
+        else
+          sample_data = @sample_bank.get(sound_name, sample_n)
+          return if sample_data.empty?
+          speed = extract_speed(value)
+        end
 
-        speed = extract_speed(value)
         amp_params = extract_amp_params(value)
         hpf_params = extract_hpf_params(value)
         player = Audio::SamplePlayer.new(sample_data, @sample_rate)
