@@ -33,6 +33,41 @@ describe Strudel::Scheduler::Cyclist do
     assert_equal expected, actual
   end
 
+  it "uses pitch-shifted sample when note() is used with a sample sound" do
+    dsl = Object.new.extend(Strudel::DSL)
+
+    fixtures_path = File.expand_path("../fixtures/samples", __dir__)
+
+    # Play WITHOUT note (plain sample, no pitch shift)
+    cyclist_plain = Strudel::Scheduler::Cyclist.new(
+      sample_rate: 44100,
+      cps: 1.0,
+      samples_path: fixtures_path
+    )
+    pat_plain = dsl.s("pitched_test")
+    cyclist_plain.set_pattern(pat_plain)
+    left_plain, _ = cyclist_plain.generate(4410)
+
+    # Play WITH note E4 (MIDI 64); pitched_test/0.wav is rooted at C4 (60)
+    # so speed should be 2^((64-60)/12) ≈ 1.26, producing different output
+    cyclist_pitched = Strudel::Scheduler::Cyclist.new(
+      sample_rate: 44100,
+      cps: 1.0,
+      samples_path: fixtures_path
+    )
+    pat_pitched = dsl.note("e4").s("pitched_test")
+    cyclist_pitched.set_pattern(pat_pitched)
+    left_pitched, _ = cyclist_pitched.generate(4410)
+
+    # Both should produce audio
+    assert left_plain.any? { |s| s.abs > 0.0001 }, "Plain sample should produce audio"
+    assert left_pitched.any? { |s| s.abs > 0.0001 }, "Pitched sample should produce audio"
+
+    # The outputs must differ because pitch shifting changes playback speed
+    refute_equal left_plain, left_pitched,
+      "note() with sample should produce pitch-shifted (different) output"
+  end
+
   it "applies Strudel-like pan curve (cos/sin) to stereo output" do
     dsl = Object.new.extend(Strudel::DSL)
 
