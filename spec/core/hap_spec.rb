@@ -100,5 +100,38 @@ describe Strudel::Hap do
 
       assert_equal Strudel::Fraction.new(Rational(1, 2)), hap.duration
     end
+
+    it "multiplies duration by clip value when value is a hash with :clip" do
+      whole = Strudel::TimeSpan.new(0, 1)
+      part = Strudel::TimeSpan.new(0, 1)
+      hap = Strudel::Hap.new(whole, part, { s: "bd", clip: 4 })
+
+      # base duration is 1, clip=4 -> duration=4
+      assert_equal Strudel::Fraction.new(4), hap.duration
+    end
+
+    it "returns half duration when clip is 0.5" do
+      whole = Strudel::TimeSpan.new(0, 1)
+      part = Strudel::TimeSpan.new(0, 1)
+      hap = Strudel::Hap.new(whole, part, { s: "bd", clip: 0.5 })
+
+      assert_equal Strudel::Fraction.new(Rational(1, 2)), hap.duration
+    end
+
+    it "returns normal duration when value is a string (no clip)" do
+      whole = Strudel::TimeSpan.new(0, 1)
+      part = Strudel::TimeSpan.new(0, 1)
+      hap = Strudel::Hap.new(whole, part, "bd")
+
+      assert_equal Strudel::Fraction.new(1), hap.duration
+    end
+
+    it "returns normal duration when value hash has no :clip key" do
+      whole = Strudel::TimeSpan.new(0, 1)
+      part = Strudel::TimeSpan.new(0, 1)
+      hap = Strudel::Hap.new(whole, part, { s: "bd" })
+
+      assert_equal Strudel::Fraction.new(1), hap.duration
+    end
   end
 end

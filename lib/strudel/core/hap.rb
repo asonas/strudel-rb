@@ -31,8 +31,15 @@ module Strudel
     end
 
     # Event duration
+    # When value is a Hash containing :clip, multiply by the clip factor
+    # (matches Strudel JS behavior)
     def duration
-      (@whole || @part).duration
+      d = (@whole || @part).duration
+      if @value.is_a?(Hash) && @value[:clip].is_a?(Numeric)
+        d * Fraction.new(@value[:clip])
+      else
+        d
+      end
     end
 
     def ==(other)
