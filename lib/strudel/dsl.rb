@@ -479,6 +479,16 @@ module Strudel
       @vca.start unless @vca.running?
     end
 
+    def record(pattern, output_path, cycles:, tail_seconds: 1.0)
+      scheduler = Scheduler::Cyclist.new(
+        cps: @cps,
+        samples_path: @samples_path
+      )
+      scheduler.set_pattern(pattern)
+      renderer = Audio::WavRenderer.new(scheduler, tail_seconds: tail_seconds)
+      renderer.render(cycles: cycles, output_path: output_path)
+    end
+
     def stop
       @vca&.stop
       @scheduler&.reset
