@@ -437,24 +437,10 @@ module Strudel
           end
         end
 
-        # Calculate target gain based on number of simultaneous sounds
-        active_count = @active_players.count { |v| v.player.playing? }
-        target_gain = active_count > 1 ? 1.0 / Math.sqrt(active_count) : 1.0
-
-        # Initialize smoothed gain if not set
-        @smoothed_gain ||= target_gain
-
-        # Apply gain with smoothing to prevent clicks
-        mixed_l.map!.with_index do |s, i|
-          # Smooth gain changes over the buffer
-          @smoothed_gain = @smoothed_gain * 0.999 + target_gain * 0.001
-          # Soft limiter (tanh) to prevent harsh clipping
-          soft_limit(s * @smoothed_gain)
-        end
-        mixed_r.map!.with_index do |s, i|
-          # Keep gain smoothing in sync with left channel
-          soft_limit(s * @smoothed_gain)
-        end
+        # Soft limiter only (no automatic gain reduction)
+        # Matches Strudel JS behavior: simple sum + clip at output
+        mixed_l.map! { |s| soft_limit(s) }
+        mixed_r.map! { |s| soft_limit(s) }
 
         [mixed_l, mixed_r]
       end
