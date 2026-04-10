@@ -10,6 +10,11 @@ module Strudel
         @samples_path = samples_path || default_samples_path
         @cache = {}
         @pitch_cache = {}
+        @remote_sources = []
+      end
+
+      def add_remote_source(source)
+        @remote_sources << source
       end
 
       # Get sample (with caching)
@@ -24,6 +29,11 @@ module Strudel
         return @pitch_cache[name] if @pitch_cache.key?(name)
 
         path = File.join(@samples_path, name, "pitch.json")
+        unless File.exist?(path)
+          remote_pitch = find_remote_pitch_json(name)
+          path = remote_pitch if remote_pitch
+        end
+
         @pitch_cache[name] = if File.exist?(path)
                                raw = JSON.parse(File.read(path))
                                raw.each_with_object({}) { |(k, v), h| h[k.to_i] = v.to_i }
@@ -60,8 +70,13 @@ module Strudel
         path = sample_path(name, n)
 
         unless File.exist?(path)
-          warn "Sample not found: #{path}"
-          return SampleData.silent
+          remote_path = find_remote(name, n)
+          if remote_path
+            path = remote_path
+          else
+            warn "Sample not found: #{path}"
+            return SampleData.silent
+          end
         end
 
         begin
@@ -94,6 +109,22 @@ module Strudel
           warn "Failed to load sample #{path}: #{e.message}"
           SampleData.silent
         end
+      end
+
+      def find_remote(name, n)
+        @remote_sources.each do |source|
+          path = source.get_path(name, n)
+          return path if path && File.exist?(path)
+        end
+        nil
+      end
+
+      def find_remote_pitch_json(name)
+        @remote_sources.each do |source|
+          path = source.pitch_json_path(name)
+          return path if path
+        end
+        nil
       end
 
       def normalize_samples(samples, bits_per_sample)

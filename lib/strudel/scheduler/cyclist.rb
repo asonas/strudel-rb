@@ -24,6 +24,7 @@ module Strudel
         @cps = cps
         @pattern = nil
         @sample_bank = Audio::SampleBank.new(samples_path)
+        Strudel.remote_sources.each { |s| @sample_bank.add_remote_source(s) }
         @active_players = []
         @current_cycle = Fraction.new(0)
         @mutex = Mutex.new

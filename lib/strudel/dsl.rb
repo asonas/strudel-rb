@@ -92,6 +92,15 @@ module Strudel
       Strudel.setbpm(bpm, bpc: bpc)
     end
 
+    # Load samples from a GitHub repository
+    # Usage: samples("github:tidalcycles/dirt-samples")
+    def samples(source)
+      return if Strudel.remote_sources.any? { |s| s.source_url == source }
+
+      remote = Audio::RemoteSampleSource.new(source)
+      Strudel.remote_sources << remote
+    end
+
     # Create a pattern using sound("bd hh sd hh") notation
     def sound(pattern_string)
       pattern = Mini::Parser.new.parse(pattern_string)
