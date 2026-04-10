@@ -18,6 +18,7 @@ require_relative "strudel/audio/duck"
 require_relative "strudel/audio/synth_player"
 require_relative "strudel/audio/vca"
 require_relative "strudel/audio/wav_renderer"
+require_relative "strudel/audio/remote_sample_source"
 require_relative "strudel/scheduler/cyclist"
 require_relative "strudel/theory/note"
 require_relative "strudel/theory/scale"
@@ -29,4 +30,9 @@ require_relative "strudel/live/session"
 
 module Strudel
   VERSION = "0.1.0"
+
+  @remote_sources = []
+  class << self
+    attr_reader :remote_sources
+  end
 end
