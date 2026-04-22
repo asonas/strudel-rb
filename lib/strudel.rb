@@ -30,17 +30,11 @@ require_relative "strudel/live/pattern_evaluator"
 require_relative "strudel/live/file_watcher"
 require_relative "strudel/live/session"
 
-require_relative "strudel/audio/say_engine"
-require_relative "strudel/audio/tts_generator"
-require_relative "strudel/audio/tts_player"
 module Strudel
   VERSION = "0.1.0"
 
   @remote_sources = []
-  @tts_generator = Audio::TTSGenerator.new(say_engine: Audio::SayEngine.new)
-
   class << self
     attr_reader :remote_sources
-    attr_reader :tts_generator
   end
 end
