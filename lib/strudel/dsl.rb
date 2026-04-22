@@ -24,7 +24,10 @@ module Strudel
     # Returns a pattern composed of all non-muted tracks.
     #
     # In live coding, a single broken track shouldn't silence the whole session.
-    # We therefore query tracks independently and drop only the failing one.
+    # We query tracks independently and, if a track errors at query time,
+    # fall back to the last version of that same-named track that queried
+    # successfully. This way a typo on reload keeps the previous sound alive
+    # instead of dropping into silence.
     def tracks
       entries = track_registry.values.reject(&:muted)
       return Pattern.silence if entries.empty?
@@ -32,10 +35,21 @@ module Strudel
       Pattern.new do |state|
         entries.flat_map do |entry|
           begin
-            entry.pattern.query(state)
+            haps = entry.pattern.query(state)
+            known_good_track_patterns[entry.name] = entry.pattern
+            haps
           rescue StandardError => e
             warn "[#{entry.name}] Error querying track: #{e.class}: #{e.message}"
-            []
+            fallback = known_good_track_patterns[entry.name]
+            if fallback && !fallback.equal?(entry.pattern)
+              begin
+                fallback.query(state)
+              rescue StandardError
+                []
+              end
+            else
+              []
+            end
           end
         end
       end
@@ -49,6 +63,13 @@ module Strudel
 
     def track_registry
       @track_registry ||= {}
+    end
+
+    # Per-track-name cache of the last Pattern that queried successfully.
+    # Persists across `clear_tracks` so reloads can fall back to the prior
+    # working version when the newly-registered pattern errors at query time.
+    def known_good_track_patterns
+      @known_good_track_patterns ||= {}
     end
 
     def next_track_name
@@ -70,7 +91,7 @@ module Strudel
       pat
     end
 
-    private :track_registry, :next_track_name, :register_track
+    private :track_registry, :known_good_track_patterns, :next_track_name, :register_track
 
     # ---- Tempo (global) ----
     #

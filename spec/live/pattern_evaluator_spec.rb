@@ -75,6 +75,26 @@ describe Strudel::Live::PatternEvaluator do
       assert_includes values, "bd"
     end
 
+    it "falls back to the previous pattern when a track errors after reload" do
+      # First load: a working track that will become the known-good fallback
+      result1 = evaluator.evaluate_string('track(:arp) { sound("bd") }')
+      haps1 = result1.query_arc(0, 1)
+      assert_equal ["bd"], haps1.map { |h| h.value[:s] }
+
+      # Reload with a broken version of the same track (errors at query time)
+      broken_code = <<~RUBY
+        track(:arp) { note("0").scale("g:minor") }
+      RUBY
+
+      result2 = nil
+      _out, _err = capture_io do
+        result2 = evaluator.evaluate_string(broken_code)
+        haps2 = result2.query_arc(0, 1)
+        values = haps2.map { |h| h.value[:s] }
+        assert_includes values, "bd", "should fall back to the previous arp pattern"
+      end
+    end
+
     it "resets track registry between evaluations" do
       result1 = evaluator.evaluate_string('track { sound("bd") }')
       values1 = result1.query_arc(0, 1).map { |h| h.value[:s] }
