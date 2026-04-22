@@ -11,6 +11,7 @@ module Strudel
         @cache = {}
         @pitch_cache = {}
         @remote_sources = []
+        @path_cache = {}
       end
 
       def add_remote_source(source)
@@ -56,6 +57,12 @@ module Strudel
         [get(name, closest_n), speed]
       end
 
+      def load_path(path)
+        return SampleData.silent unless File.exist?(path)
+
+        @path_cache[path] ||= load_wav_file(path)
+      end
+
       private
 
       def default_samples_path
@@ -79,36 +86,32 @@ module Strudel
           end
         end
 
-        begin
-          reader = WaveFile::Reader.new(path)
-          format = reader.format
-          buffer = reader.read(reader.total_sample_frames)
-          reader.close
+        load_wav_file(path)
+      end
 
-          # Keep (up to) stereo channels (Strudel-like)
-          channels =
-            if format.channels == 1
-              [buffer.samples]
-            else
-              # WaveFile returns frames like [L, R, ...]
-              channel_count = [format.channels, 2].min
-              chans = Array.new(channel_count) { [] }
-              buffer.samples.each do |frame|
-                channel_count.times do |i|
-                  chans[i] << frame[i]
-                end
-              end
-              chans
+      def load_wav_file(path)
+        reader = WaveFile::Reader.new(path)
+        format = reader.format
+        buffer = reader.read(reader.total_sample_frames)
+        reader.close
+
+        channels =
+          if format.channels == 1
+            [buffer.samples]
+          else
+            channel_count = [format.channels, 2].min
+            chans = Array.new(channel_count) { [] }
+            buffer.samples.each do |frame|
+              channel_count.times { |i| chans[i] << frame[i] }
             end
+            chans
+          end
 
-          # Normalize to Float32 per channel
-          normalized_channels = channels.map { |ch| normalize_samples(ch, format.bits_per_sample) }
-
-          SampleData.new(normalized_channels, format.sample_rate)
-        rescue StandardError => e
-          warn "Failed to load sample #{path}: #{e.message}"
-          SampleData.silent
-        end
+        normalized_channels = channels.map { |ch| normalize_samples(ch, format.bits_per_sample) }
+        SampleData.new(normalized_channels, format.sample_rate)
+      rescue StandardError => e
+        warn "Failed to load sample #{path}: #{e.message}"
+        SampleData.silent
       end
 
       def find_remote(name, n)
