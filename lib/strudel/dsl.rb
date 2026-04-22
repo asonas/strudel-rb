@@ -122,6 +122,18 @@ module Strudel
       Strudel.remote_sources << remote
     end
 
+    # Generate speech audio with a TTS engine (default: macOS `say`) and play
+    # it as a sample. `voice`, `rate`, and `engine` are generation-time
+    # parameters baked into the cache key. Playback effects (.lpf, .gain,
+    # .room, etc.) can be chained as usual.
+    #
+    # Example:
+    #   track { say("hello", voice: "Kyoko").room(0.5).lpf(1200) }
+    def say(text, voice: nil, rate: nil, engine: nil)
+      path = Strudel.tts_generator.generate(text, engine: engine, voice: voice, rate: rate)
+      Pattern.pure(s: "say", path: path)
+    end
+
     # Create a pattern using sound("bd hh sd hh") notation
     def sound(pattern_string)
       pattern = Mini::Parser.new.parse(pattern_string)

@@ -310,26 +310,40 @@ describe Strudel::Pattern do
 
   describe "#fit" do
     it "adds unit and speed to make sample fit the cycle" do
-      pattern = Strudel::Pattern.pure({ s: "breaks" }).fit
-      haps = pattern.query_arc(0, 1)
+      original_cps = Strudel.cps
+      Strudel.setcps(1.0)
 
-      assert_equal 1, haps.length
-      assert_equal "c", haps.first.value[:unit]
-      assert_equal 1.0, haps.first.value[:speed]
+      begin
+        pattern = Strudel::Pattern.pure({ s: "breaks" }).fit
+        haps = pattern.query_arc(0, 1)
+
+        assert_equal 1, haps.length
+        assert_equal "c", haps.first.value[:unit]
+        assert_in_delta 1.0, haps.first.value[:speed], 1e-9
+      ensure
+        Strudel.setcps(original_cps)
+      end
     end
 
     it "adjusts speed based on hap duration" do
-      # Two haps per cycle = each hap is 0.5 cycles
-      pattern = Strudel::Pattern.fastcat(
-        Strudel::Pattern.pure({ s: "breaks" }),
-        Strudel::Pattern.pure({ s: "breaks" })
-      ).fit
-      haps = pattern.query_arc(0, 1)
+      original_cps = Strudel.cps
+      Strudel.setcps(1.0)
 
-      assert_equal 2, haps.length
-      # Each hap is 0.5 cycles, so speed should be 2.0 to fit
-      assert_equal 2.0, haps[0].value[:speed]
-      assert_equal 2.0, haps[1].value[:speed]
+      begin
+        # Two haps per cycle = each hap is 0.5 cycles
+        pattern = Strudel::Pattern.fastcat(
+          Strudel::Pattern.pure({ s: "breaks" }),
+          Strudel::Pattern.pure({ s: "breaks" })
+        ).fit
+        haps = pattern.query_arc(0, 1)
+
+        assert_equal 2, haps.length
+        # Each hap is 0.5 cycles, cps=1.0, so speed = 1.0 / 0.5 = 2.0
+        assert_in_delta 2.0, haps[0].value[:speed], 1e-9
+        assert_in_delta 2.0, haps[1].value[:speed], 1e-9
+      ensure
+        Strudel.setcps(original_cps)
+      end
     end
   end
 
