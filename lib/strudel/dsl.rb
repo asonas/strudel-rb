@@ -375,7 +375,18 @@ module Strudel
       Pattern.stack(*tracks.flatten)
     end
 
-    module_function :register, :setcps, :setcpm, :setbpm
+    # Opens (or returns cached) a MIDI input device and returns a
+    # Strudel::Midi::Input. Use its #cc(num, chan=nil) method to build
+    # patterns that read live CC values.
+    #
+    # Example:
+    #   ctrl = midi_input("IAC Driver Bus 1")
+    #   track { sound("bd*4").gain(ctrl.cc(7)) }
+    def midi_input(device_name, open_device: true)
+      Midi::Registry.open(device_name, open_device: open_device)
+    end
+
+    module_function :register, :setcps, :setcpm, :setbpm, :midi_input
 
     # ---- Built-in register functions (Phase 5) ----
 
