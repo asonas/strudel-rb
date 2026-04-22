@@ -41,6 +41,16 @@ module Strudel
       pure(value)
     end
 
+    # Query-time value injection. The accessor block is evaluated on every
+    # query, allowing external state (e.g. MIDI CC values) to be threaded
+    # into a Pattern without re-evaluation of the user's pattern code.
+    # Mirrors Strudel JS's ref().
+    def self.ref(&accessor)
+      raise ArgumentError, "block is required" unless accessor
+
+      pure(1).with_value { |_| reify(accessor.call) }.inner_join
+    end
+
     # Sequence (plays all patterns within one cycle)
     def self.fastcat(*items)
       return silence if items.empty?
