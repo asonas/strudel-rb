@@ -156,6 +156,12 @@ module Strudel
         @channels.empty? || @channels.all?(&:empty?)
       end
 
+      def duration_seconds
+        return 0.0 if empty? || @sample_rate.nil? || @sample_rate.zero?
+
+        length.to_f / @sample_rate.to_f
+      end
+
       def self.silent
         new([], 44_100)
       end
