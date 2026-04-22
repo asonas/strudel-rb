@@ -163,6 +163,10 @@ module Strudel
           speed = extract_speed(value)
         end
 
+        if value.is_a?(Hash) && value[:unit] == "c"
+          speed *= sample_data.duration_seconds
+        end
+
         amp_params = extract_amp_params(value)
         hpf_params = extract_hpf_params(value)
 
