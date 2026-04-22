@@ -6,6 +6,7 @@ gem "ffi-portaudio"
 gem "wavefile"
 gem "parslet"
 gem "listen"
+gem "unimidi"
 gem "logger"
 
 group :development, :test do
