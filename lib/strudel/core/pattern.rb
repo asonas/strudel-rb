@@ -245,12 +245,18 @@ module Strudel
       apply_op(other) { |a, b| a**b }
     end
 
-    # Fit sample to cycle length
+    # Fit sample to cycle length (Strudel JS parity).
+    # Pairs with scheduler handling of unit: "c".
     def fit
       Pattern.new do |state|
         query(state).map do |hap|
-          duration = hap.whole ? hap.whole.duration : hap.part.duration
-          speed = 1.0 / duration.to_f
+          cps = Strudel.cps.to_f
+          hap_duration = hap.whole ? hap.whole.duration.to_f : hap.part.duration.to_f
+          slicedur = 1.0
+          if hap.value.is_a?(Hash) && hap.value[:end] && hap.value[:begin]
+            slicedur = hap.value[:end].to_f - hap.value[:begin].to_f
+          end
+          speed = (cps / hap_duration) * slicedur
 
           new_value = case hap.value
                       when Hash
