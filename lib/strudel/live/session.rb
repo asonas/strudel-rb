@@ -50,6 +50,7 @@ module Strudel
       def stop
         @watcher&.stop
         @runner&.cleanup
+        Strudel::Midi::Registry.stop_all
       end
 
       private
