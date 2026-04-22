@@ -147,8 +147,13 @@ module Strudel
         end
 
         # For sample sounds
-        note_val = value.is_a?(Hash) ? value[:note] : nil
-        if note_val
+        path_override = value.is_a?(Hash) ? value[:path] : nil
+
+        if path_override
+          sample_data = @sample_bank.load_path(path_override)
+          return if sample_data.empty?
+          speed = extract_speed(value)
+        elsif (note_val = value.is_a?(Hash) ? value[:note] : nil)
           sample_data, pitch_speed = @sample_bank.get_pitched(sound_name, note_val)
           return if sample_data.empty?
           speed = extract_speed(value) * pitch_speed
@@ -180,6 +185,7 @@ module Strudel
           [value, 0]
         when Hash
           name = value[:s] || value[:sound]
+          name ||= "say" if value[:path]
           n = value[:n] || 0
           [name, n]
         else
