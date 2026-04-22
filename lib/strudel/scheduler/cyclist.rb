@@ -92,12 +92,6 @@ module Strudel
       def trigger_sound(hap)
         value = hap.value
 
-        # Extract TTS text first (TTS takes priority)
-        tts_text = extract_tts_text(value)
-        if tts_text
-          return trigger_tts_sound(hap, tts_text)
-        end
-
         # Extract sound name and sample number from value
         sound_name, sample_n = extract_sound_info(value)
         return unless sound_name
@@ -394,67 +388,6 @@ module Strudel
         params[:psustain] = value[:psustain] if value[:psustain]
         params[:panchor] = value[:panchor] if value[:panchor]
         params
-      end
-
-      def extract_tts_text(value)
-        return nil unless value.is_a?(Hash)
-
-        value[:text]
-      end
-
-      def extract_tts_voice(value)
-        return nil unless value.is_a?(Hash)
-
-        value[:voice]
-      end
-
-      def extract_tts_rate(value)
-        return nil unless value.is_a?(Hash)
-
-        value[:tts_rate]
-      end
-
-      def extract_tts_pitch(value)
-        return nil unless value.is_a?(Hash)
-
-        value[:tts_pitch]
-      end
-
-      def trigger_tts_sound(hap, text)
-        value = hap.value
-        duration_seconds = hap.duration.to_f / @cps
-
-        gain = extract_gain(value)
-        orbit = extract_orbit(value)
-        pan = extract_pan(value)
-        delay_params = extract_delay_params(value, duration_seconds)
-        duck_event = extract_duck_event(value)
-        reverb_params = extract_reverb_params(value)
-        amp_params = extract_amp_params(value)
-        hpf_params = extract_hpf_params(value)
-
-        # Extract TTS-specific parameters
-        voice = extract_tts_voice(value)
-        tts_rate = extract_tts_rate(value)
-        tts_pitch = extract_tts_pitch(value)
-
-        # Create TTS player with default generator from Strudel module
-        player = Audio::TTSPlayer.new(Strudel.tts_generator, @sample_rate)
-        player.trigger(
-          text: text,
-          gain: gain,
-          duration: duration_seconds,
-          voice: voice,
-          rate: tts_rate,
-          pitch: tts_pitch,
-          **amp_params,
-          **hpf_params
-        )
-
-        apply_orbit_delay(orbit, delay_params) if delay_params
-        apply_orbit_reverb(orbit, reverb_params) if reverb_params
-        trigger_duck(duck_event) if duck_event
-        @active_players << ActiveVoice.new(player, orbit, pan)
       end
 
       def mix_players(frame_count)

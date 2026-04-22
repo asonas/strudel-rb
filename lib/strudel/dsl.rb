@@ -138,28 +138,6 @@ module Strudel
       end
     end
 
-
-    def say(text_pattern)
-      # Convert text pattern to sound object with TTS text
-      case text_pattern
-      when String
-        Pattern.pure({ text: text_pattern })
-      when Pattern
-        text_pattern.with_value do |v|
-          case v
-          when String
-            { text: v }
-          when Hash
-            v[:text] ? v : { text: v.to_s }
-          else
-            { text: v.to_s }
-          end
-        end
-      else
-        Pattern.pure({ text: text_pattern.to_s })
-      end
-    end
-
     alias_method :s, :sound
 
     # Notation like n("0 1 2 3").sound("jazz")
