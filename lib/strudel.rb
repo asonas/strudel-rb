@@ -23,6 +23,9 @@ require_relative "strudel/scheduler/cyclist"
 require_relative "strudel/theory/note"
 require_relative "strudel/theory/scale"
 require_relative "strudel/tempo"
+require_relative "strudel/tts/engine"
+require_relative "strudel/tts/generator"
+require_relative "strudel/tts/say_engine"
 require_relative "strudel/dsl"
 require_relative "strudel/midi/input"
 require_relative "strudel/midi/registry"
@@ -36,5 +39,8 @@ module Strudel
   @remote_sources = []
   class << self
     attr_reader :remote_sources
+    attr_accessor :tts_generator
   end
+
+  self.tts_generator = TTS::Generator.new(engines: [TTS::SayEngine.new])
 end
