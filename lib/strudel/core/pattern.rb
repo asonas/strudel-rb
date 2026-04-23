@@ -285,6 +285,40 @@ module Strudel
       end
     end
 
+    # Split each hap into n equal-duration sub-haps, tagging each with
+    # begin:/end: fractions (0..1) for SamplePlayer-level slicing.
+    # n may be an Integer or a Pattern (evaluated per outer hap).
+    def chop(n_pat)
+      n_pattern = Pattern.reify(n_pat)
+      Pattern.new do |state|
+        query(state).flat_map do |hap|
+          query_span = hap.whole || hap.part
+          n_haps = n_pattern.query(state.set_span(query_span))
+          n = (n_haps.first&.value || 1).to_i
+          next [hap] if n <= 1
+
+          whole = hap.whole || hap.part
+          step = whole.duration / Fraction.new(n)
+
+          (0...n).filter_map do |i|
+            sub_begin = whole.begin_time + step * Fraction.new(i)
+            sub_end = whole.begin_time + step * Fraction.new(i + 1)
+            sub_whole = TimeSpan.new(sub_begin, sub_end)
+            sub_part = sub_whole.intersection(hap.part)
+            next nil unless sub_part
+
+            new_value =
+              case hap.value
+              when Hash then hap.value.merge(begin: Rational(i, n), end: Rational(i + 1, n))
+              else { s: hap.value, begin: Rational(i, n), end: Rational(i + 1, n) }
+              end
+
+            Hap.new(sub_whole, sub_part, new_value, hap.context)
+          end
+        end
+      end
+    end
+
     # Apply function every n cycles
     def every(n, &func)
       Pattern.new do |state|
