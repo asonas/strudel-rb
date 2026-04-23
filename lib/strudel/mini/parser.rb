@@ -32,13 +32,16 @@ module Strudel
       # Multiplier (*n)
       rule(:multiplier) { str("*") >> match('[0-9.]').repeat(1).as(:mult) }
 
+      # Divider (/n) — slow operator, mirror of multiplier
+      rule(:divider) { str("/") >> match('[0-9.]').repeat(1).as(:div) }
+
       # Replicate (!n)
       rule(:replicate) { str("!") >> match('[0-9.]').repeat(1).as(:rep) }
 
       # Basic element (atom, rest, elongate, or group)
       rule(:element) do
         (
-          (elongate | rest | atom | group | angle_group) >> (replicate | multiplier).maybe
+          (elongate | rest | atom | group | angle_group) >> (replicate | multiplier | divider).maybe
         ).as(:element)
       end
 
@@ -109,6 +112,18 @@ module Strudel
       rule(element: { sequence: subtree(:seq), rep: simple(:rep) }) { { sequence: seq, rep: rep.to_s.to_i } }
       rule(element: { stack: subtree(:items), rep: simple(:rep) }) { { stack: items, rep: rep.to_s.to_i } }
 
+      # Element (with divider — slow operator)
+      rule(element: { atom: subtree(:atom_content), div: simple(:div) }) { { atom: atom_content, div: div.to_s.to_f } }
+      rule(element: { slowcat: { sequence: subtree(:items) }, div: simple(:div) }) do
+        { slowcat: items.is_a?(Array) ? items : [items], div: div.to_s.to_f }
+      end
+      rule(element: { slowcat: subtree(:cat), div: simple(:div) }) { { slowcat: cat, div: div.to_s.to_f } }
+      rule(element: { sequence: subtree(:seq), div: simple(:div) }) { { sequence: seq, div: div.to_s.to_f } }
+      rule(element: { stack: subtree(:items), div: simple(:div) }) { { stack: items, div: div.to_s.to_f } }
+      rule(element: { rest: simple(:_), div: simple(:div) }) do
+        { rest: nil, div: div.to_s.to_f }
+      end
+
       rule(element: { rest: simple(:_), mult: simple(:mult) }) do
         { rest: nil, mult: mult.to_s.to_f }
       end
@@ -142,6 +157,9 @@ module Strudel
       end
       rule(slowcat: { sequence: subtree(:items) }, rep: simple(:rep)) do
         { slowcat: items.is_a?(Array) ? items : [items], rep: rep.to_s.to_i }
+      end
+      rule(slowcat: { sequence: subtree(:items) }, div: simple(:div)) do
+        { slowcat: items.is_a?(Array) ? items : [items], div: div.to_s.to_f }
       end
       rule(slowcat: { sequence: subtree(:items) }) do
         { slowcat: items.is_a?(Array) ? items : [items] }
@@ -195,12 +213,12 @@ module Strudel
             items = ast[:sequence].is_a?(Array) ? ast[:sequence] : [ast[:sequence]]
             steps = items.flat_map { |it| expand_replicate_step(it) }
             fn = steps_to_events_fn(steps)
-            ast[:mult] ? multiply_events_fn(fn, ast[:mult]) : fn
+            apply_rate_modifiers(fn, ast)
           elsif ast[:stack]
             items = ast[:stack].is_a?(Array) ? ast[:stack] : [ast[:stack]]
             fns = items.map { |it| build_events_fn(it) }
             fn = ->(cycle_index) { fns.flat_map { |f| f.call(cycle_index) } }
-            ast[:mult] ? multiply_events_fn(fn, ast[:mult]) : fn
+            apply_rate_modifiers(fn, ast)
           elsif ast[:slowcat]
             items = ast[:slowcat].is_a?(Array) ? ast[:slowcat] : [ast[:slowcat]]
             fns = items.map { |it| build_events_fn(it) }
@@ -220,10 +238,10 @@ module Strudel
                 fns[idx].call(cycle_index)
               end
             end
-            ast[:mult] ? multiply_events_fn(fn, ast[:mult]) : fn
+            apply_rate_modifiers(fn, ast)
           elsif ast[:atom]
             base = build_events_fn(process_atom(ast[:atom]))
-            ast[:mult] ? multiply_events_fn(base, ast[:mult]) : base
+            apply_rate_modifiers(base, ast)
           else
             ->(_cycle_index) { [] }
           end
@@ -270,6 +288,39 @@ module Strudel
           end
 
           events
+        end
+      end
+
+      def apply_rate_modifiers(fn, ast)
+        fn = multiply_events_fn(fn, ast[:mult]) if ast[:mult]
+        fn = divide_events_fn(fn, ast[:div]) if ast[:div]
+        fn
+      end
+
+      def divide_events_fn(events_fn, div)
+        d = div.to_i
+        d = 1 if d <= 0
+        lambda do |cycle_index|
+          return events_fn.call(cycle_index) if d == 1
+
+          # Slow semantics: one base cycle is stretched across d output cycles.
+          # For output cycle `cycle_index`, we're somewhere inside the stretch of
+          # base cycle floor(cycle_index / d). The offset within that stretch is
+          # cycle_index % d (in units of output cycles).
+          base_cycle = cycle_index.div(d)
+          portion = cycle_index % d
+
+          events_fn.call(base_cycle).filter_map do |e|
+            # Stretch event times by d, then shift so they're relative to the current output cycle.
+            s = e.start_pos * d - portion
+            t = e.end_pos * d - portion
+
+            # Emit if the event overlaps with this output cycle [0, 1].
+            # We keep the full stretched span so the caller can recover the true whole.
+            next nil if t <= 0 || s >= 1
+
+            Event.new(s, t, e.value)
+          end
         end
       end
 
