@@ -1,6 +1,21 @@
 # frozen_string_literal: true
 
 module Strudel
+  # @!method rlpf(cutoff)
+  #   Resonant low-pass filter. Registered via Strudel::DSL.register(:rlpf).
+  #   @param cutoff [Numeric, Pattern] 0.0-1.0 (mapped to (x*12)**4 internally)
+  #   @return [Pattern]
+  # @!method rhpf(cutoff)
+  #   Resonant high-pass filter. Registered via Strudel::DSL.register(:rhpf).
+  #   @param cutoff [Numeric, Pattern]
+  #   @return [Pattern]
+  # @!method trancegate(density, seed, length)
+  #   Pseudo-random gate. Registered via Strudel::DSL.register(:trancegate).
+  #   @return [Pattern]
+  # @!method glide(time)
+  #   Portamento between values. Registered via Strudel::DSL.register(:glide).
+  #   @param time [Numeric, Pattern]
+  #   @return [Pattern]
   class Pattern
     def initialize(&query)
       @query = query
