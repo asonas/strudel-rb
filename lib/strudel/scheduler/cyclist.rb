@@ -169,6 +169,7 @@ module Strudel
 
         amp_params = extract_amp_params(value)
         hpf_params = extract_hpf_params(value)
+        slice_params = extract_slice_params(value)
 
         # When clip/loop/release are not explicitly set, let the sample play its
         # full natural length by passing nil as duration (matches Strudel JS behavior)
@@ -176,7 +177,8 @@ module Strudel
         sample_duration = has_explicit_duration ? duration_seconds : nil
 
         player = Audio::SamplePlayer.new(sample_data, @sample_rate)
-        player.trigger(gain: gain, speed: speed, duration: sample_duration, **amp_params, **hpf_params)
+        player.trigger(gain: gain, speed: speed, duration: sample_duration,
+                       **amp_params, **hpf_params, **slice_params)
         apply_orbit_delay(orbit, delay_params) if delay_params
         apply_orbit_reverb(orbit, reverb_params) if reverb_params
         trigger_duck(duck_event) if duck_event
@@ -375,6 +377,15 @@ module Strudel
         params[:decay] = value[:decay] if value[:decay]
         params[:sustain] = value[:sustain] if value[:sustain]
         params[:release] = value[:release] if value[:release]
+        params
+      end
+
+      def extract_slice_params(value)
+        return {} unless value.is_a?(Hash)
+
+        params = {}
+        params[:begin_frac] = value[:begin].to_f if value[:begin]
+        params[:end_frac] = value[:end].to_f if value[:end]
         params
       end
 
