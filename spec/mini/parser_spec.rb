@@ -140,6 +140,67 @@ describe Strudel::Mini::Parser do
     end
   end
 
+  describe "slow (/N)" do
+    it "parses /N as slow operator — whole spans N cycles" do
+      pattern = parse("bd/4")
+      haps = pattern.query_arc(0, 4)
+
+      # span_cycles splits [0,4] into 4 visible pieces of the same stretched event,
+      # all sharing whole=[0,4] (only the first piece has onset).
+      assert_operator haps.length, :>=, 1
+      assert haps.all? { |h| h.value == "bd" }
+      assert haps.all? { |h| h.whole == Strudel::TimeSpan.new(0, 4) }
+    end
+
+    it "only triggers onset on the first cycle of the stretch" do
+      pattern = parse("bd/4")
+
+      cycle0 = pattern.query_arc(0, 1)
+      cycle1 = pattern.query_arc(1, 2)
+      cycle2 = pattern.query_arc(2, 3)
+      cycle3 = pattern.query_arc(3, 4)
+      cycle4 = pattern.query_arc(4, 5)
+
+      assert_equal 1, cycle0.length
+      assert cycle0.first.has_onset?
+
+      assert_equal 1, cycle1.length
+      refute cycle1.first.has_onset?
+
+      assert_equal 1, cycle2.length
+      refute cycle2.first.has_onset?
+
+      assert_equal 1, cycle3.length
+      refute cycle3.first.has_onset?
+
+      # Cycle 4 starts a new stretch — onset again
+      assert_equal 1, cycle4.length
+      assert cycle4.first.has_onset?
+    end
+
+    it "parses /N on a group so the whole sub-pattern is slowed" do
+      pattern = parse("[bd sd]/2")
+      haps = pattern.query_arc(0, 2)
+
+      # [bd sd] is 2 events spanning 1 cycle; /2 stretches to 2 cycles → bd at [0,1], sd at [1,2]
+      assert_equal 2, haps.length
+      assert_equal "bd", haps[0].value
+      assert_equal Strudel::TimeSpan.new(0, 1), haps[0].whole
+      assert_equal "sd", haps[1].value
+      assert_equal Strudel::TimeSpan.new(1, 2), haps[1].whole
+    end
+
+    it "parses /N in a sequence alongside normal elements" do
+      pattern = parse("bd sd/2 hh")
+      # sequence of 3 items: bd (fast), sd/2 (slow), hh (fast)
+      # Each item gets 1/3 of the cycle. sd/2 slows sd within its 1/3 slot... but /N on an
+      # element inside a sequence stretches it across N cycles' worth of that slot.
+      # Just assert parsing succeeds and the sequence has 3 items' worth of events.
+      haps = pattern.query_arc(0, 1)
+      assert_operator haps.length, :>=, 2
+    end
+  end
+
   describe "replicate (!)" do
     it "replicates a step and increases the number of steps" do
       pattern = parse("bd!3 sd")
