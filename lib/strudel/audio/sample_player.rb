@@ -25,8 +25,12 @@ module Strudel
       end
 
       # Start playback
-      def trigger(gain: 1.0, speed: 1.0, duration: nil, attack: nil, decay: nil, sustain: nil, release: nil, hpf: nil)
-        @position = 0.0
+      def trigger(gain: 1.0, speed: 1.0, duration: nil, attack: nil, decay: nil,
+                  sustain: nil, release: nil, hpf: nil, begin_frac: nil, end_frac: nil)
+        src_len = [@sample_data.channels[0]&.length || 0,
+                   @sample_data.channels[1]&.length || (@sample_data.channels[0]&.length || 0),].min
+        @position = begin_frac ? (src_len * begin_frac.to_f) : 0.0
+        @end_position = end_frac ? (src_len * end_frac.to_f) : nil
         @playing = true
         @gain = gain
         @speed = speed
@@ -87,7 +91,7 @@ module Strudel
 
           idx = @position.to_i
 
-          if idx >= src_len || idx < 0
+          if idx >= src_len || idx < 0 || (@end_position && idx >= @end_position)
             @playing = false
             break
           end
