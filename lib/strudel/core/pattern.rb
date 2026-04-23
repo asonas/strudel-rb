@@ -319,6 +319,31 @@ module Strudel
       end
     end
 
+    # Chop then shuffle sub-hap values within each cycle using deterministic
+    # pseudo-random based on cycle number. Time slots are preserved; only the
+    # value (which carries begin:/end:) is permuted.
+    def scramble(n_pat)
+      chopped = chop(n_pat)
+      Pattern.new do |state|
+        state.span.span_cycles.flat_map do |subspan|
+          sub_state = state.set_span(subspan)
+          haps_in_cycle = chopped.query(sub_state)
+          n = haps_in_cycle.length
+          next haps_in_cycle if n <= 1
+
+          cycle_num = subspan.begin_time.sam.value.to_f
+          order = haps_in_cycle.each_with_index.map do |hap, i|
+            seed = cycle_num + (i.to_f + 0.5) / n
+            [Pattern.send(:time_to_rand, seed), hap]
+          end.sort_by(&:first).map(&:last)
+
+          haps_in_cycle.zip(order).map do |slot_hap, value_hap|
+            Hap.new(slot_hap.whole, slot_hap.part, value_hap.value, slot_hap.context)
+          end
+        end
+      end
+    end
+
     # Apply function every n cycles
     def every(n, &func)
       Pattern.new do |state|
