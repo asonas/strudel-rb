@@ -480,6 +480,23 @@ module Strudel
       end
     end
 
+    # Cut-up: shuffle n equal slices of the source per cycle.
+    # Slices each play exactly once per cycle in deterministic pseudo-random order.
+    #
+    #   track { say("hello everyone").cutup(8).fit }
+    register(:cutup) do |n, pat|
+      pat.scramble(n)
+    end
+
+    # Stutter: chop + scramble with double subdivision.
+    # Each cycle produces n^2 events — n unique slices, each appearing n times,
+    # scrambled across the cycle. Much denser than cutup; good for glitch/IDM feel.
+    #
+    #   track { say("hello everyone").stutter(4).fit }
+    register(:stutter) do |n, pat|
+      pat.chop(n).scramble(n)
+    end
+
     private
 
     # Port of Strudel's timeToRand (packages/core/signal.mjs)
