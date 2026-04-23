@@ -16,6 +16,16 @@ module Strudel
   #   Portamento between values. Registered via Strudel::DSL.register(:glide).
   #   @param time [Numeric, Pattern]
   #   @return [Pattern]
+  # @!method cutup(n)
+  #   Chop sample into n equal slices and play each exactly once in random order per cycle.
+  #   Registered via Strudel::DSL.register(:cutup).
+  #   @param n [Integer, Pattern]
+  #   @return [Pattern]
+  # @!method stutter(n)
+  #   Chop sample into n slices and stutter them (n*n events per cycle, each slice repeated n times, scrambled).
+  #   Registered via Strudel::DSL.register(:stutter).
+  #   @param n [Integer, Pattern]
+  #   @return [Pattern]
   class Pattern
     def initialize(&query)
       @query = query
