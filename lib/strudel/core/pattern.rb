@@ -62,6 +62,7 @@ module Strudel
     # Convert value to pattern (returns as-is if already a pattern)
     def self.reify(value)
       return value if value.is_a?(Pattern)
+      return Mini::Parser.new.parse(value) if value.is_a?(String) && !value.empty?
 
       pure(value)
     end
@@ -460,124 +461,124 @@ module Strudel
 
     # Set volume (0.0 - 1.0)
     def gain(value)
-      set_control(:gain, value)
+      set_numeric_control(:gain, value)
     end
 
     # Set pan (0.0 = left, 0.5 = center, 1.0 = right)
     def pan(value)
-      set_control(:pan, value)
+      set_numeric_control(:pan, value)
     end
 
     # Set playback speed
     def speed(value)
-      set_control(:speed, value)
+      set_numeric_control(:speed, value)
     end
 
     # Delay amount (0-1). Currently accepted as a control but not rendered yet.
     def delay(value = 0.5)
-      set_control(:delay, value)
+      set_numeric_control(:delay, value)
     end
 
     def delaytime(value)
-      set_control(:delaytime, value)
+      set_numeric_control(:delaytime, value)
     end
 
     alias_method :delayt, :delaytime
     alias_method :dt, :delaytime
 
     def delayfeedback(value)
-      set_control(:delayfeedback, value)
+      set_numeric_control(:delayfeedback, value)
     end
 
     alias_method :delayfb, :delayfeedback
     alias_method :dfb, :delayfeedback
 
     def delaysync(value)
-      set_control(:delaysync, value)
+      set_numeric_control(:delaysync, value)
     end
 
     def delayspeed(value)
-      set_control(:delayspeed, value)
+      set_numeric_control(:delayspeed, value)
     end
 
     # Set low-pass filter cutoff frequency (Hz)
     def lpf(value)
-      set_control(:lpf, value)
+      set_numeric_control(:lpf, value)
     end
 
     # Set low-pass filter envelope amount (how much the envelope opens the filter)
     def lpenv(value)
-      set_control(:lpenv, value)
+      set_numeric_control(:lpenv, value)
     end
 
     # Set low-pass filter envelope attack time (seconds)
     def lpa(value)
-      set_control(:lpa, value)
+      set_numeric_control(:lpa, value)
     end
 
     # Set low-pass filter envelope decay time (seconds)
     def lpd(value)
-      set_control(:lpd, value)
+      set_numeric_control(:lpd, value)
     end
 
     # Set low-pass filter envelope sustain level (0.0 - 1.0)
     def lps(value)
-      set_control(:lps, value)
+      set_numeric_control(:lps, value)
     end
 
     # Set low-pass filter envelope release time (seconds)
     def lpr(value)
-      set_control(:lpr, value)
+      set_numeric_control(:lpr, value)
     end
 
     # Set low-pass filter resonance (Q value, 0.0 - 1.0)
     def lpq(value)
-      set_control(:lpq, value)
+      set_numeric_control(:lpq, value)
     end
 
     # Set high-pass filter cutoff frequency
     def hpf(value)
-      set_control(:hpf, value)
+      set_numeric_control(:hpf, value)
     end
 
     # Set detune amount (for supersaw, etc.)
     def detune(value)
-      set_control(:detune, value)
+      set_numeric_control(:detune, value)
     end
 
     # Set number of stacked voices (for supersaw, etc.)
     def unison(value)
-      set_control(:unison, value)
+      set_numeric_control(:unison, value)
     end
 
     # Set stereo spread (for supersaw, etc.)
     # NOTE: Currently used as a hint only; strudel-rb renders mono internally.
     def spread(value)
-      set_control(:spread, value)
+      set_numeric_control(:spread, value)
     end
 
     # ---- Amp Envelope Controls (Strudel-like) ----
 
     def attack(value)
-      set_control(:attack, value)
+      set_numeric_control(:attack, value)
     end
 
     alias_method :att, :attack
 
     def decay(value)
-      set_control(:decay, value)
+      set_numeric_control(:decay, value)
     end
 
     alias_method :dec, :decay
 
     def sustain(value)
-      set_control(:sustain, value)
+      set_numeric_control(:sustain, value)
     end
 
     alias_method :sus, :sustain
 
     def release(value)
-      set_control(:release, value)
+      set_numeric_control(:release, value)
     end
 
     alias_method :rel, :release
@@ -586,12 +587,12 @@ module Strudel
 
     # Frequency Modulation harmonicity ratio
     def fmh(value)
-      set_control(:fmh, value)
+      set_numeric_control(:fmh, value)
     end
 
     # Frequency Modulation index (brightness). In Strudel this is `fmi` and `fm` is a synonym.
     def fmi(value)
-      set_control(:fmi, value)
+      set_numeric_control(:fmi, value)
     end
 
     alias_method :fm, :fmi
@@ -601,21 +602,21 @@ module Strudel
     end
 
     def duckdepth(value)
-      set_control(:duckdepth, value)
+      set_numeric_control(:duckdepth, value)
     end
 
     def duckattack(value)
-      set_control(:duckattack, value)
+      set_numeric_control(:duckattack, value)
     end
 
     def duckonset(value)
-      set_control(:duckonset, value)
+      set_numeric_control(:duckonset, value)
     end
 
     alias_method :duckons, :duckonset
 
     def duckorbit(value)
-      set_control(:duckorbit, value)
+      set_numeric_control(:duckorbit, value)
     end
 
     alias_method :duck, :duckorbit
@@ -627,7 +628,7 @@ module Strudel
 
     # Set orbit (audio routing channel)
     def orbit(value)
-      set_control(:orbit, value)
+      set_numeric_control(:orbit, value)
     end
 
     # Alias for orbit
@@ -637,12 +638,12 @@ module Strudel
 
     # Set reverb wet/dry mix (0.0 - 1.0)
     def room(value)
-      set_control(:room, value)
+      set_numeric_control(:room, value)
     end
 
     # Set reverb room size (0 - 10)
     def roomsize(value)
-      set_control(:roomsize, value)
+      set_numeric_control(:roomsize, value)
     end
 
     alias_method :rsize, :roomsize
@@ -663,14 +664,14 @@ module Strudel
 
     # Set clip (event duration factor, 0.0 - 1.0)
     def clip(value)
-      set_control(:clip, value)
+      set_numeric_control(:clip, value)
     end
 
     # ---- Distortion Controls ----
 
     # Set distortion amount
     def distort(value)
-      set_control(:distort, value)
+      set_numeric_control(:distort, value)
     end
 
     alias_method :dist, :distort
@@ -697,7 +698,7 @@ module Strudel
 
     # Set post-distortion volume
     def distortvol(value)
-      set_control(:distortvol, value)
+      set_numeric_control(:distortvol, value)
     end
 
     # ---- Pattern Operation Methods ----
@@ -859,7 +860,7 @@ module Strudel
 
     # Scrub: set sample playback position control.
     def scrub(value)
-      set_control(:scrub, value)
+      set_numeric_control(:scrub, value)
     end
 
     # Restart: restart this pattern at each onset of the trigger pattern.
@@ -1009,6 +1010,12 @@ module Strudel
     def self.int32(n)
       n &= 0xFFFF_FFFF
       n >= 0x8000_0000 ? n - 0x1_0000_0000 : n
+    end
+
+    # Set numeric control (parses String as Mini-Notation and coerces values to Float)
+    def set_numeric_control(key, value)
+      prepared = value.is_a?(String) ? Mini::Parser.new.parse(value).with_value { |v| Float(v.to_s) } : value
+      set_control(key, prepared)
     end
 
     # Set control value (pattern-aware with inner join)
