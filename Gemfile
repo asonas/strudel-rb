@@ -14,3 +14,9 @@ group :development, :test do
   gem "rake"
   gem "rubocop", require: false
 end
+
+group :bench, optional: true do
+  gem "vernier"
+  gem "stackprof"
+  gem "benchmark-ips"
+end
