@@ -11,8 +11,8 @@ module Strudel
       rule(:space) { match('\s').repeat(1) }
       rule(:space?) { space.maybe }
 
-      # Atom (sound name, note name including sharps/flats)
-      rule(:atom_char) { match('[a-zA-Z0-9_#]') }
+      # Atom (sound name, note name including sharps/flats, decimal numbers)
+      rule(:atom_char) { match('[a-zA-Z0-9_#.]') }
       rule(:atom_name) { atom_char.repeat(1).as(:name) }
 
       # Sample number (:n)
