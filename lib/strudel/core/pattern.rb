@@ -1083,8 +1083,24 @@ module Strudel
           end
         end
       else
-        block.call(left, right)
+        # Mirror Strudel JS's numeralArgs: when both sides parse as numbers,
+        # apply the op numerically (e.g. "0 2 4".add("0 3 4") -> 0/5/8).
+        # Falls back to raw op so non-numeric strings keep concatenating.
+        l_num = parse_numeral(left)
+        r_num = parse_numeral(right)
+        if l_num && r_num
+          block.call(l_num, r_num)
+        else
+          block.call(left, right)
+        end
       end
+    end
+
+    def parse_numeral(value)
+      return value if value.is_a?(Numeric)
+      return nil unless value.is_a?(String)
+
+      Float(value, exception: false)
     end
   end
 end
