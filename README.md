@@ -116,6 +116,36 @@ s("breaks165").fit
 sound("bd sd, hh*4")
 ```
 
+### Strudel-style String Operators (Ruby::Box)
+
+Strudel JS lets you write arithmetic chains directly on mini-notation strings,
+e.g. `n("0 2 4".add("<0 3 4 0>"))`. In Ruby, calling `.add` on a `String` would
+normally raise `NoMethodError`, and adding it globally would pollute every
+`String` in the process. With Ruby 4.0's experimental `Ruby::Box`, we can scope
+that monkey patch to a single live-coding evaluation.
+
+Run your pattern file with `RUBY_BOX=1`:
+
+```bash
+RUBY_BOX=1 bundle exec ruby bin/strudel-watch pattern.rb
+```
+
+Inside the file you can now write:
+
+```ruby
+# Strudel parity: arithmetic on bare strings
+n("0 2 4".add("<0 3 4 0>")).scale("c:major").s("sawtooth")
+
+# Multiplication, subtraction, etc. all work
+gain("0.5 0.7".mul("0.8"))
+```
+
+The `String#add` / `#sub` / `#mul` / `#div` / `#mod` / `#pow` overrides are
+applied inside a fresh `Ruby::Box` per evaluation and do not leak into the
+library, your tests, or any code outside the evaluator. Without `RUBY_BOX=1`,
+strudel-rb falls back to the legacy `instance_eval` path and the string
+chains are unavailable; the rest of the DSL is unchanged.
+
 ### Synthesizers
 
 strudel-rb includes built-in synthesizers that generate sound using oscillators. Available waveforms:

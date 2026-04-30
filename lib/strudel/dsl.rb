@@ -134,9 +134,10 @@ module Strudel
       Pattern.pure(s: "say", path: path)
     end
 
-    # Create a pattern using sound("bd hh sd hh") notation
-    def sound(pattern_string)
-      pattern = Mini::Parser.new.parse(pattern_string)
+    # Create a pattern using sound("bd hh sd hh") notation.
+    # Accepts a mini-notation string or an already-built Pattern.
+    def sound(pattern_or_string)
+      pattern = Pattern.reify(pattern_or_string)
       # Convert values to sound information
       pattern.with_value do |v|
         case v
@@ -154,16 +155,16 @@ module Strudel
 
     # Notation like n("0 1 2 3").sound("jazz")
     # Also used for scale degrees: n("<0 4 7>").scale("c:minor")
-    def n(pattern_string)
-      pattern = Mini::Parser.new.parse(pattern_string)
+    def n(pattern_or_string)
+      pattern = Pattern.reify(pattern_or_string)
       pattern.with_value do |v|
         v.nil? ? nil : v.to_i
       end
     end
 
     # Notation like note("c4 e4 g4")
-    def note(pattern_string)
-      pattern = Mini::Parser.new.parse(pattern_string)
+    def note(pattern_or_string)
+      pattern = Pattern.reify(pattern_or_string)
       pattern.with_value do |v|
         midi_note = Theory::Note.parse(v)
         { note: midi_note || v }
@@ -206,20 +207,20 @@ module Strudel
     end
 
     # Gain pattern
-    def gain(pattern_string)
-      pattern = Mini::Parser.new.parse(pattern_string)
+    def gain(pattern_or_string)
+      pattern = Pattern.reify(pattern_or_string)
       pattern.with_value { |v| v.to_f }
     end
 
     # Speed pattern
-    def speed(pattern_string)
-      pattern = Mini::Parser.new.parse(pattern_string)
+    def speed(pattern_or_string)
+      pattern = Pattern.reify(pattern_or_string)
       pattern.with_value { |v| v.to_f }
     end
 
     # Pan pattern
-    def pan(pattern_string)
-      pattern = Mini::Parser.new.parse(pattern_string)
+    def pan(pattern_or_string)
+      pattern = Pattern.reify(pattern_or_string)
       pattern.with_value { |v| v.to_f }
     end
 
