@@ -1,0 +1,360 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Browser harness for strudel-rb Mini-Notation exploration.
+# Starts a local WEBrick server and opens a page where you can type
+# Mini-Notation strings and inspect the resulting Hap events.
+#
+# Usage:
+#   bin/strudel-browser          # listens on http://localhost:7000
+#   bin/strudel-browser 8080     # custom port
+
+require "webrick"
+require "json"
+require_relative "../lib/strudel"
+
+PORT = (ARGV[0] || 7000).to_i
+
+HTML = <<~HTML
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>strudel-rb browser harness</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      body {
+        font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, monospace;
+        background: #1a1a2e;
+        color: #e0e0e0;
+        margin: 0;
+        padding: 16px;
+        min-height: 100vh;
+      }
+      h1 { color: #a78bfa; font-size: 1.1rem; margin: 0 0 12px; }
+      .row { display: flex; gap: 12px; align-items: flex-start; }
+      label { display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 4px; }
+      textarea {
+        width: 100%;
+        background: #0f172a;
+        color: #f1f5f9;
+        border: 1px solid #334155;
+        border-radius: 6px;
+        padding: 10px;
+        font-family: inherit;
+        font-size: 0.9rem;
+        resize: vertical;
+      }
+      textarea:focus { outline: none; border-color: #7c3aed; }
+      .controls { display: flex; gap: 8px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
+      .controls label { margin: 0; }
+      input[type=number] {
+        width: 64px;
+        background: #0f172a;
+        color: #f1f5f9;
+        border: 1px solid #334155;
+        border-radius: 4px;
+        padding: 4px 6px;
+        font-family: inherit;
+        font-size: 0.85rem;
+      }
+      button {
+        background: #7c3aed;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 14px;
+        font-family: inherit;
+        font-size: 0.85rem;
+        cursor: pointer;
+      }
+      button:hover { background: #6d28d9; }
+      #error {
+        color: #f87171;
+        font-size: 0.8rem;
+        min-height: 1.2em;
+        margin: 4px 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8rem;
+        margin-top: 8px;
+      }
+      th {
+        text-align: left;
+        color: #94a3b8;
+        border-bottom: 1px solid #334155;
+        padding: 4px 8px;
+        font-weight: 500;
+      }
+      td { padding: 4px 8px; border-bottom: 1px solid #1e293b; }
+      tr:hover td { background: #1e293b; }
+      .onset { color: #4ade80; }
+      .no-onset { color: #94a3b8; }
+      .val-hash { color: #fbbf24; }
+      .val-str { color: #67e8f9; }
+      .val-num { color: #f472b6; }
+      #count { font-size: 0.75rem; color: #64748b; margin: 4px 0; }
+      .timeline {
+        position: relative;
+        height: 48px;
+        background: #0f172a;
+        border: 1px solid #334155;
+        border-radius: 6px;
+        margin-top: 8px;
+        overflow: hidden;
+      }
+      .hap-bar {
+        position: absolute;
+        top: 6px;
+        height: 36px;
+        border-radius: 3px;
+        opacity: 0.85;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.65rem;
+        overflow: hidden;
+        white-space: nowrap;
+        cursor: default;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>strudel-rb browser harness</h1>
+    <div class="row">
+      <div style="flex:1">
+        <label for="notation">Mini-Notation</label>
+        <textarea id="notation" rows="3" placeholder="bd hh sd hh"></textarea>
+      </div>
+    </div>
+    <div class="controls">
+      <label>cycles&nbsp;from</label>
+      <input type="number" id="from" value="0" step="1" min="0">
+      <label>to</label>
+      <input type="number" id="to" value="1" step="1" min="1">
+      <button id="parse-btn">Parse</button>
+      <label style="margin-left:8px"><input type="checkbox" id="auto"> auto</label>
+    </div>
+    <div id="error"></div>
+    <div id="count"></div>
+    <div class="timeline" id="timeline"></div>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>onset</th>
+          <th>whole begin</th>
+          <th>whole end</th>
+          <th>part begin</th>
+          <th>part end</th>
+          <th>value</th>
+        </tr>
+      </thead>
+      <tbody id="hap-body"></tbody>
+    </table>
+
+    <script>
+      const notationEl = document.getElementById("notation");
+      const fromEl     = document.getElementById("from");
+      const toEl       = document.getElementById("to");
+      const errorEl    = document.getElementById("error");
+      const countEl    = document.getElementById("count");
+      const hapBody    = document.getElementById("hap-body");
+      const timeline   = document.getElementById("timeline");
+      const autoCheck  = document.getElementById("auto");
+
+      const COLORS = [
+        "#7c3aed","#0ea5e9","#10b981","#f59e0b",
+        "#ef4444","#ec4899","#06b6d4","#84cc16",
+      ];
+
+      async function doParse() {
+        const notation = notationEl.value.trim();
+        if (!notation) { errorEl.textContent = ""; hapBody.innerHTML = ""; countEl.textContent = ""; timeline.innerHTML = ""; return; }
+
+        const cycleFrom = parseFloat(fromEl.value) || 0;
+        const cycleTo   = parseFloat(toEl.value)   || 1;
+
+        let resp, data;
+        try {
+          resp = await fetch("/parse", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ notation, from: cycleFrom, to: cycleTo }),
+          });
+          data = await resp.json();
+        } catch (e) {
+          errorEl.textContent = "Network error: " + e.message;
+          return;
+        }
+
+        if (!resp.ok || data.error) {
+          errorEl.textContent = data.error || ("HTTP " + resp.status);
+          hapBody.innerHTML = "";
+          countEl.textContent = "";
+          timeline.innerHTML = "";
+          return;
+        }
+
+        errorEl.textContent = "";
+        const haps = data.haps;
+        countEl.textContent = haps.length + " hap" + (haps.length === 1 ? "" : "s");
+
+        // Timeline
+        const span = cycleTo - cycleFrom;
+        timeline.innerHTML = "";
+        haps.forEach((h, i) => {
+          const bar = document.createElement("div");
+          bar.className = "hap-bar";
+          const left  = ((h.part_begin - cycleFrom) / span) * 100;
+          const width = ((h.part_end - h.part_begin) / span) * 100;
+          bar.style.left  = left.toFixed(3) + "%";
+          bar.style.width = Math.max(width, 0.2).toFixed(3) + "%";
+          bar.style.background = COLORS[i % COLORS.length];
+          bar.title = formatVal(h.value) + "\\n" + h.part_begin + "–" + h.part_end;
+          bar.textContent = formatVal(h.value);
+          timeline.appendChild(bar);
+        });
+
+        // Table
+        hapBody.innerHTML = haps.map((h, i) => {
+          const onset = h.onset
+            ? '<span class="onset">yes</span>'
+            : '<span class="no-onset">no</span>';
+          return `<tr>
+            <td>${i}</td>
+            <td>${onset}</td>
+            <td>${frac(h.whole_begin)}</td>
+            <td>${frac(h.whole_end)}</td>
+            <td>${frac(h.part_begin)}</td>
+            <td>${frac(h.part_end)}</td>
+            <td>${valCell(h.value)}</td>
+          </tr>`;
+        }).join("");
+      }
+
+      function frac(v) {
+        if (v === null || v === undefined) return "nil";
+        // Server sends rational as "p/q" string or float
+        return String(v);
+      }
+
+      function formatVal(v) {
+        if (v === null || v === undefined) return "nil";
+        if (typeof v === "object") return JSON.stringify(v);
+        return String(v);
+      }
+
+      function valCell(v) {
+        if (v === null || v === undefined) return '<span class="no-onset">nil</span>';
+        if (typeof v === "object") return '<span class="val-hash">' + esc(JSON.stringify(v)) + "</span>";
+        if (typeof v === "number") return '<span class="val-num">' + v + "</span>";
+        return '<span class="val-str">' + esc(String(v)) + "</span>";
+      }
+
+      function esc(s) {
+        return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+      }
+
+      document.getElementById("parse-btn").addEventListener("click", doParse);
+      notationEl.addEventListener("keydown", e => {
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") doParse();
+      });
+
+      let autoTimer = null;
+      function startAuto() {
+        if (autoTimer) return;
+        autoTimer = setInterval(doParse, 600);
+      }
+      function stopAuto() {
+        clearInterval(autoTimer);
+        autoTimer = null;
+      }
+      autoCheck.addEventListener("change", () => autoCheck.checked ? startAuto() : stopAuto());
+    </script>
+  </body>
+  </html>
+HTML
+
+# --- Rack-style handlers -----------------------------------------------
+
+class ParseServlet < WEBrick::HTTPServlet::AbstractServlet
+  def do_POST(req, res)
+    body = JSON.parse(req.body)
+    notation   = body["notation"].to_s.strip
+    cycle_from = (body["from"] || 0).to_r
+    cycle_to   = (body["to"]   || 1).to_r
+
+    if notation.empty?
+      json_response(res, { error: "notation is empty" }, 400)
+      return
+    end
+
+    pattern = Strudel::Mini::Parser.new.parse(notation)
+    haps    = pattern.query_arc(cycle_from, cycle_to)
+
+    rows = haps.map do |h|
+      {
+        onset:       h.has_onset?,
+        whole_begin: rat_str(h.whole&.begin_time),
+        whole_end:   rat_str(h.whole&.end_time),
+        part_begin:  rat_str(h.part.begin_time),
+        part_end:    rat_str(h.part.end_time),
+        value:       serialize_value(h.value)
+      }
+    end
+
+    json_response(res, { haps: rows })
+  rescue => e
+    json_response(res, { error: e.message }, 422)
+  end
+
+  private
+
+  def rat_str(v)
+    return nil if v.nil?
+    r = v.is_a?(Strudel::Fraction) ? v.to_r : v.to_r
+    r.denominator == 1 ? r.numerator.to_s : "#{r.numerator}/#{r.denominator}"
+  end
+
+  def serialize_value(v)
+    case v
+    when Hash    then v.transform_keys(&:to_s)
+    when Numeric then v
+    else              v.to_s
+    end
+  end
+
+  def json_response(res, data, status = 200)
+    res.status = status
+    res["Content-Type"] = "application/json"
+    res.body = JSON.generate(data)
+  end
+end
+
+class RootServlet < WEBrick::HTTPServlet::AbstractServlet
+  def do_GET(_req, res)
+    res.status = 200
+    res["Content-Type"] = "text/html; charset=utf-8"
+    res.body = HTML
+  end
+end
+
+# --- Server ----------------------------------------------------------------
+
+server = WEBrick::HTTPServer.new(
+  Port: PORT,
+  Logger: WEBrick::Log.new($stderr, WEBrick::BasicLog::WARN),
+  AccessLog: []
+)
+server.mount("/",      RootServlet)
+server.mount("/parse", ParseServlet)
+
+trap("INT")  { server.shutdown }
+trap("TERM") { server.shutdown }
+
+puts "strudel-rb browser harness → http://localhost:#{PORT}"
+server.start
