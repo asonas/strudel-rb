@@ -33,6 +33,7 @@ require_relative "strudel/live/pattern_evaluator"
 require_relative "strudel/live/file_watcher"
 require_relative "strudel/live/session"
 
+require_relative "strudel/bridge"
 module Strudel
   VERSION = "0.1.0"
 
