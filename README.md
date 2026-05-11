@@ -14,6 +14,8 @@ bundle install
 
 ## Sample Files
 
+### Local samples
+
 Place WAV files under `samples/` using one directory per kit name:
 
 ```
@@ -26,6 +28,41 @@ samples/
 ```
 
 Multiple variants (`bd/0.wav`, `bd/1.wav`, ...) are addressed with `:n` in Mini-Notation (e.g. `"bd:1"`).
+
+### Remote samples (`samples` method)
+
+The `samples` DSL loads sample packs from a GitHub repository, mirroring the [Strudel sample loading convention](https://strudel.cc/learn/samples/). The target repository must contain a `strudel.json` manifest at its root.
+
+```ruby
+# pattern.rb
+samples("github:tidalcycles/dirt-samples")
+
+sound("bd hh sd hh")
+```
+
+The source string takes the form `github:<user>/<repo>[/<branch>]`. The repository defaults to `samples` and the branch defaults to `main`. WAV files are downloaded on first use into `~/.cache/strudel-rb/samples/<user>/<repo>/` and reused on subsequent runs.
+
+`strudel.json` follows the same shape used by [strudel.cc](https://strudel.cc/) — a map from sample name to one or more relative `.wav` paths, with an optional `_base` field:
+
+```json
+{
+  "_base": "https://example.com/samples/",
+  "bd": ["bd/BT0A0A7.wav", "bd/BT0A0D0.wav"],
+  "hh": ["hh/000_hh3closedhh.wav"],
+  "sd": "sd/snare.wav"
+}
+```
+
+Within Mini-Notation, names registered in `strudel.json` are referenced directly. Variants are selected with `:n`:
+
+```ruby
+samples("github:tidalcycles/dirt-samples")
+
+track(:drums) { sound("bd:0 hh sd:1 hh") }
+track(:perc)  { sound("cp ~ cp ~").gain(0.6) }
+```
+
+You can also load multiple packs in one file; later `samples` calls add to the lookup chain, and local `samples/` files still take priority.
 
 ## Quick Start
 
