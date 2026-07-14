@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "string_pattern_ops"
+require_relative "dollar_colon_preprocessor"
 
 module Strudel
   module Live
@@ -8,6 +9,7 @@ module Strudel
       include DSL
 
       def evaluate_string(code)
+        code = DollarColonPreprocessor.call(code)
         clear_tracks if respond_to?(:clear_tracks)
         result = box_eval(code)
 
