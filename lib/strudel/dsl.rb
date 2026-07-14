@@ -7,7 +7,10 @@ module Strudel
     # ---- Track DSL (Strudel-like $:) ----
     #
     # In Strudel, `$:` definitions are automatically stacked and can be muted with `_$:`.
-    # Ruby cannot override `$:` (it's $LOAD_PATH), so we provide `track` / `_track` instead.
+    # `$:` is `$LOAD_PATH` at the Ruby parser level and cannot be redefined, so this DSL
+    # exposes `track` / `_track` as the underlying primitive. In the live-coding path,
+    # `Strudel::Live::DollarColonPreprocessor` rewrites `$:` / `_$:` source lines into
+    # these calls before evaluation, so files can use either form interchangeably.
     #
     # Example:
     #   track { sound("bd") }
