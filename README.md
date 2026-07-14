@@ -98,6 +98,18 @@ _track(:lead) { n("0 2 4 7").scale("c:minor").s("supersaw") } # muted; remove le
 - `track { ... }` registers a track. `_track { ... }` is the same but starts muted, which is handy when you want to toggle parts without commenting whole blocks out.
 - Multiple `track` calls play in parallel.
 
+### `$:` track shorthand
+
+For a terser live-coding feel that mirrors Strudel JS, you can write tracks with the `$:` prefix. A preprocessor rewrites these lines into `track` / `_track` calls before evaluation:
+
+```ruby
+$: sound("hh*8")                    # anonymous track
+$:kick sound("bd*4").gain(0.3)      # named track (:kick)
+_$:lead n("0 2 4 7").s("supersaw")  # muted track, toggle by removing the leading underscore
+```
+
+`$:` is `$LOAD_PATH` at the Ruby parser level and cannot be redefined, so this rewrite happens on the source string before it is evaluated. It is available inside pattern files run through `bin/strudel-watch`.
+
 ## Tempo (CPS / BPM)
 
 strudel-rb follows Strudel/Tidal's **CPS (cycles per second)** model. Set it at the top of your pattern file:
