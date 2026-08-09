@@ -8,6 +8,7 @@ gem "parslet"
 gem "listen"
 gem "unimidi"
 gem "logger"
+gem "webrick"
 
 group :development, :test do
   gem "minitest"

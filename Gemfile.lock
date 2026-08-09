@@ -70,6 +70,7 @@ GEM
       midi-winmm (~> 0.1, >= 0.1.10)
     vernier (1.10.0)
     wavefile (1.1.2)
+    webrick (1.9.2)
 
 PLATFORMS
   aarch64-linux-gnu
@@ -97,6 +98,7 @@ DEPENDENCIES
   unimidi
   vernier
   wavefile
+  webrick
 
 BUNDLED WITH
    2.7.1
