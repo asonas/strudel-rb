@@ -8,7 +8,7 @@ A Strudel-like live coding music library for Ruby.
 
 strudel-rb is a Ruby library inspired by [Strudel](https://strudel.cc/) (the JavaScript implementation of Tidal Cycles). You can write drum patterns and melodic sequences in Mini-Notation, evaluate them on the fly, and hear changes the moment you save the file.
 
-strudel-rb is an **independent implementation** written from scratch in Ruby against the public Strudel / Tidal Cycles language specifications and documentation. It is not a source-code port of Strudel; the Mini-Notation parser, the pattern engine, and the audio pipeline are original Ruby code. See [Acknowledgements](#acknowledgements) and [License](#license).
+strudel-rb is a Ruby implementation based on the public Strudel / Tidal Cycles language specifications and documentation. The Parslet-based Mini-Notation parser is an original Ruby implementation of the publicly documented syntax. See [Acknowledgements](#acknowledgements) and [License](#license).
 
 ## Installation
 
@@ -300,7 +300,7 @@ lib/strudel/
 
 strudel-rb is inspired by and modeled on the language design of [Strudel](https://strudel.cc/) and [Tidal Cycles](https://tidalcycles.org/). The Mini-Notation syntax, the pattern/CPS model, and the DSL naming follow their published specifications and documentation so that patterns feel familiar to users of those tools.
 
-strudel-rb does not incorporate source code from Strudel or Tidal Cycles. All Ruby code here — the Parslet-based Mini-Notation parser, the pattern engine, and the audio pipeline — is an independent implementation. Strudel and Tidal Cycles are wonderful projects, and strudel-rb exists thanks to the ideas they pioneered.
+The Parslet-based Mini-Notation parser was independently authored for this project and is available under the MIT License. Compatibility implementations derived from third-party projects remain subject to their respective licenses. Strudel and Tidal Cycles are wonderful projects, and strudel-rb exists thanks to the ideas they pioneered.
 
 ## License
 
